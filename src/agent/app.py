@@ -22,6 +22,7 @@ from rich.console import Console
 
 from pi_py_sdk import PiError
 
+from .commands import CommandContext, build_registry
 from .loop import run_agent
 from .model import open_model
 from .permissions import PermissionMode, Permissions
@@ -29,15 +30,6 @@ from .render import Renderer, _summarize_args
 from .system_prompt import build_system_prompt
 from .tools import coding_tools
 from .types import AgentMessage, user_message
-
-_HELP = """\
-Commands:
-  /help          show this help
-  /clear         start a fresh conversation
-  /exit, /quit   leave (or press Ctrl-D)
-
-While the agent is working, press Ctrl-C to interrupt the current turn.
-Mutating tools (write/edit/bash) ask for approval — answer y (once), a (always), or n."""
 
 
 def _make_approver(console: Console):
@@ -112,8 +104,12 @@ async def _run_repl(
     history: list[AgentMessage] = []
     renderer = Renderer(console)
     approver = _make_approver(console)
+    registry = build_registry(cwd)
 
     async with open_model(provider=provider, model=model, reasoning=reasoning) as m:
+        ctx = CommandContext(
+            console=console, history=history, tools=tools, permissions=permissions, model=m, registry=registry
+        )
         console.print(f"[bold]py-agent[/bold] [dim]({m.name}, cwd={cwd}, perms={permissions.mode.value})[/dim]")
         console.print("[dim]Type a message, or /help. Ctrl-D to quit.[/dim]\n")
         while True:
@@ -125,17 +121,18 @@ async def _run_repl(
 
             if not line:
                 continue
-            if line in ("/exit", "/quit"):
-                break
-            if line == "/help":
-                console.print(_HELP)
-                continue
-            if line == "/clear":
-                history.clear()
-                console.print("[dim]conversation cleared[/dim]")
-                continue
 
-            history.append(user_message(line))
+            if line.startswith("/"):
+                outcome = registry.dispatch(line, ctx)
+                if outcome.exit:
+                    break
+                if outcome.prompt is None:
+                    continue  # command handled itself
+                prompt_to_run = outcome.prompt  # e.g. a markdown command expanded to a prompt
+            else:
+                prompt_to_run = line
+
+            history.append(user_message(prompt_to_run))
             await _run_turn(m, tools, history, system_prompt, renderer, permissions, approver)
     return 0
 

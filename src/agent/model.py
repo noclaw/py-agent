@@ -53,6 +53,24 @@ class Model:
     def name(self) -> str:
         return f"{self._provider}/{self._model}"
 
+    @property
+    def provider(self) -> str:
+        return self._provider
+
+    @property
+    def model(self) -> str:
+        return self._model
+
+    def set_model(self, model: str, provider: str | None = None) -> None:
+        """Switch the model (and optionally provider) for subsequent turns.
+
+        Cheap: the underlying client streams any model, so this just changes which
+        provider/model id the next ``stream`` call targets.
+        """
+        self._model = model
+        if provider is not None:
+            self._provider = provider
+
     async def stream(
         self,
         *,

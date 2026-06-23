@@ -10,9 +10,9 @@ a clean starting point for personal-assistant / second-brain agents (swap the co
 toolset for your own).
 
 > **Status:** working end to end — the full tool set (read/write/edit/bash/grep/find/ls),
-> the agent loop, system prompt, interactive CLI/REPL, a **permissions** system and a
-> **hooks** system (both modeled on Claude Code). Next: slash commands, sessions,
-> compaction, memory tools. See [`PLAN.md`](PLAN.md).
+> the agent loop, system prompt, interactive CLI/REPL, **permissions**, **hooks**, and
+> **slash commands** with custom markdown commands (all modeled on Claude Code). Next:
+> sessions, compaction, memory tools. See [`PLAN.md`](PLAN.md).
 
 ## Architecture
 
@@ -64,9 +64,37 @@ uv run pya                                      # interactive REPL (Ctrl-C abort
 uv run pya --cwd /path/to/project --model claude-sonnet-4-6
 ```
 
-In the REPL, `/help` lists commands, `/clear` resets the conversation, `/exit` quits.
 The agent streams its reply, shows each tool call (`› bash …`) and result (`✓`/`✗`), and
 prints a token summary when the turn finishes.
+
+## Slash commands
+
+In the REPL, lines starting with `/` are commands. Built-ins:
+
+| command | what it does |
+|---|---|
+| `/help` | list available commands |
+| `/clear` | start a fresh conversation |
+| `/tools` | list the available tools |
+| `/model [provider/]model` | show or switch the model |
+| `/mode <mode>` | show or set the permission mode |
+| `/exit`, `/quit` | leave |
+
+**Custom commands** are markdown files (just like Claude Code's `.claude/commands/`):
+drop a file at `.pya/commands/<name>.md` (project) or `~/.pya/commands/<name>.md` (user).
+The filename is the command, the body is a prompt template, and optional frontmatter sets
+its `description`/`argument-hint`. `$ARGUMENTS` expands to all args; `$1`, `$2`, … to
+positional ones. Subdirectories namespace as `dir:name`.
+
+```markdown
+---
+description: Review a file for bugs
+argument-hint: <path>
+---
+Read $1 and review it for bugs and edge cases. Be concise.
+```
+
+Then `/review src/agent/loop.py` runs that prompt as a turn.
 
 ## Permissions
 
