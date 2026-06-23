@@ -9,7 +9,9 @@ It's meant as an example implementation — small enough to read while learning 
 a clean starting point for personal-assistant / second-brain agents (swap the coding
 toolset for your own).
 
-> **Status:** early scaffold (Phase 1). See [`PLAN.md`](PLAN.md) for the full roadmap.
+> **Status:** the core works — message types, the default tools (read/write/edit/bash),
+> and the agent loop are implemented and tested (incl. a live end-to-end run). Still to
+> come: the system prompt and the interactive CLI/REPL. See [`PLAN.md`](PLAN.md).
 
 ## Architecture
 
