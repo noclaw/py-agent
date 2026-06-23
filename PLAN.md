@@ -1,317 +1,200 @@
-# py-agent — Implementation Plan
+# py-agent — Plan & Status
 
-A Python port of the Pi coding-agent. The **agent loop and tools are written in
-readable Python**; the **model/provider/streaming/auth layer is delegated to Pi's
-`@earendil-works/pi-ai`** through an extended `pi-py` SDK. The goal is an example
-implementation that is (a) easy to read for people learning Python, and (b) a clean
-starting point for personal-assistant / second-brain agents.
+A Python port of the Pi coding-agent. The **agent loop and tools are written in readable
+Python**; the **model / provider / streaming / auth layer is delegated to Pi's
+`@earendil-works/pi-ai`** through the `pi-py` SDK. The goal is an example implementation
+that is (a) easy to read for people learning Python, and (b) a clean starting point for
+personal-assistant / second-brain agents.
+
+The shipped feature set deliberately mirrors **Claude Code** (tools, hooks, slash + markdown
+commands, permissions, sessions, and — planned — skills) so the concepts transfer.
 
 ---
 
-## 0. Architecture & the key decision
+## Architecture
 
 Pi is three layered npm packages. Understanding the split is the whole design:
 
-| Layer | npm package | Repo path | We... |
-|---|---|---|---|
-| **Model / provider / streaming / auth** | `@earendil-works/pi-ai` | `packages/ai` | **Reuse** via a Node shim (don't reimplement) |
-| **Generic agent loop + harness** | `@earendil-works/pi-agent-core` | `packages/agent` | **Port to Python** (the loop, turn structure, tool-exec orchestration, compaction & session primitives) |
-| **Coding product** (7 tools, system prompt, sessions, slash cmds, config) | `@earendil-works/pi-coding-agent` | `packages/coding-agent` | **Port to Python** (the concrete tools + prompt + app) |
+| Layer | npm package | We… |
+|---|---|---|
+| **Model / provider / streaming / auth** | `@earendil-works/pi-ai` | **Reuse** via a Node shim (don't reimplement) |
+| **Generic agent loop + harness** | `@earendil-works/pi-agent-core` | **Ported to Python** (loop, turn structure, tool-exec orchestration) |
+| **Coding product** (tools, system prompt, sessions, slash cmds) | `@earendil-works/pi-coding-agent` | **Ported to Python** |
 
-So: `pi-ai` is the only piece we keep as a black box, because it carries 30+
-providers, OAuth, transports, and local-model support we don't want to rewrite. The
-loop and tools — the parts worth learning and customizing — become Python.
+`pi-ai` is the only piece kept as a black box (30+ providers, OAuth, transports, local
+models). The loop and tools — the parts worth learning and customizing — are Python.
 
-### Why a Node shim is required
-
-`pi-py` today spawns `pi --mode rpc`, which runs the **entire** agent (loop + tools +
-sessions). There is **no Pi mode or CLI that streams raw model output without the
-agent loop**. So to get "just the model call" into Python we add a small Node script
-that imports `pi-ai` and exposes its `streamSimple` over stdin/stdout JSONL. The
-Python loop calls that shim once per assistant turn.
+There is **no Pi mode that streams raw model output without the full agent**, so `pi-py`
+gained a small Node shim that imports `pi-ai` and exposes `streamSimple` over JSONL; the
+Python loop calls it once per assistant turn.
 
 ```
-┌─────────────────────────── Python (this repo) ───────────────────────────┐
-│  CLI / REPL / renderer                                                     │
-│  Agent loop  ──calls──>  Tools (read/write/edit/bash/grep/find/ls)         │
-│       │                                                                    │
-│       │ per turn: stream(model, context{system,messages,tools}, options)   │
-│       ▼                                                                    │
-│  pi_py_sdk.PiModelClient  ──JSONL over stdin/stdout──┐                     │
-└──────────────────────────────────────────────────────┼────────────────────┘
-                                                        ▼
-                         Node shim  ──imports──>  @earendil-works/pi-ai
-                         (streamSimple → providers, auth, transports, local)
+┌─────────────────────────── Python (py-agent) ────────────────────────────┐
+│  cli / app / render                                                       │
+│  loop  ──>  tools (read/write/edit/bash/grep/find/ls)                     │
+│    │        gated by:  hooks → permissions → approval                     │
+│    │ per turn: stream(context{system, messages, tools})                  │
+│    ▼                                                                      │
+│  pi_py_sdk.PiModelClient  ──JSONL──┐                                      │
+└──────────────────────────────────────┼───────────────────────────────────┘
+                                        ▼
+              Node shim  ──imports──>  @earendil-works/pi-ai
+              (providers, auth, transports, local models)
 ```
 
-`pi-py`'s existing `PiAgent` (full-agent RPC client) stays **untouched**; we add a new
-sibling low-level client. The generic `Transport` (subprocess + JSONL framing) is
-already reusable.
+---
+
+## Status — what's built ✅
+
+**`pi-py` 0.2.0** (published to PyPI) — added `PiModelClient`/`PiModelClientSync` + the
+Node shim (`_shim/stream.mjs`) bridging pi-ai's `streamSimple`. `PiAgent` (full-agent RPC
+client) left untouched.
+
+**`py-agent`** depends on `pi-py-sdk>=0.2.0` from PyPI. Core phases complete:
+
+| Phase | Status | Where |
+|---|---|---|
+| 0. pi-py model-streaming client + shim | ✅ | `pi-py` repo |
+| 1. Scaffold (uv, `pya` CLI, src layout) | ✅ | `pyproject.toml`, `src/agent/` |
+| 2. Core types (messages, events, `Tool`, converters) | ✅ | `types.py` |
+| 3. Model adapter (`Model`, `ModelLike`, `open_model`) | ✅ | `model.py` |
+| 4. Tools — full set read/write/edit/bash/grep/find/ls | ✅ | `tools/` |
+| 5. Agent loop (`run_agent`, parallel/sequential exec, gating, cancel) | ✅ | `loop.py` |
+| 6. System prompt (programmatic, + project context) | ✅ | `system_prompt.py` |
+| 7. CLI / REPL / renderer (one-shot + multi-turn, Ctrl-C abort) | ✅ | `cli.py`, `app.py`, `render.py` |
+
+**Optional features already done** (Claude-Code-shaped):
+
+- ✅ **Permissions** — modes (default/acceptEdits/plan/bypass), allow/deny rules
+  (`bash(git *)`, `write(src/*)`), interactive y/a/n approval. `permissions.py`.
+- ✅ **Hooks** — `PreToolUse` / `PostToolUse` / `UserPromptSubmit` with allow/deny +
+  `additional_context`, tool-name matchers, sync/async. `hooks.py`.
+- ✅ **Slash commands + custom markdown commands** — built-ins (`/help`, `/clear`,
+  `/model`, `/tools`, `/mode`, `/sessions`, `/resume`, `/exit`) and `.pya/commands/*.md`
+  with `$ARGUMENTS`/`$1` + frontmatter. `commands.py`.
+- ✅ **Sessions** — linear JSONL save/resume per directory; `-c`/`--resume`/`--no-session`.
+  `sessions.py`.
+
+**Tests:** ~90 unit (driven by a scripted fake-model fixture, no network) + a few gated
+live integration tests (`PI_LIVE_LLM=1`).
 
 ---
 
-## Phase 0 — Extend pi-py with a model-streaming client  *(prerequisite, lives in `/Users/jeff/code/pi-py`)*
+## Remaining / optional phases (by recommended priority)
 
-**0.1 Node shim** — `pi_py_sdk/_shim/stream.mjs`
-- Imports the modern, non-deprecated API: `builtinModels()` / `createModels()` and
-  `Models.streamSimple` (avoid the `/compat` entrypoint — its header says it's
-  temporary). Source pattern to mirror: `packages/coding-agent/src/core/sdk.ts`.
-- Reads JSONL requests from stdin, one per line:
-  - `{type:"stream", id, model:{provider,id} | <full Model object>, context:{systemPrompt, messages, tools}, options:{reasoning, apiKey, temperature, maxTokens, signal-via-abort, ...}}`
-  - `{type:"abort", id}` — cancel an in-flight stream (maps to an `AbortController`).
-  - `{type:"list_models"}` — return the resolved catalog (built-ins + any custom).
-- For each `AssistantMessageEvent` from the stream, writes
-  `{type:"stream_event", id, event}`; on completion `{type:"stream_done", id, message}`;
-  on failure `{type:"stream_error", id, message}` (pi-ai surfaces errors as a terminal
-  event, not a throw). Every event already carries `partial`/`message`, so Python
-  needs **no delta-accumulation logic**.
-- **Packaging decision (pick one, document it):**
-  1. *Resolve `pi-ai` from the existing `pi` install* (npx fallback already pulls
-     `@earendil-works/pi-coding-agent`, which bundles `pi-ai`). Lowest friction.
-  2. *Pin a tiny vendored `package.json`* next to the shim and `npm i` on first run.
-  3. *`npx --yes @earendil-works/pi-ai@<pinned>`* with the shim passed in.
-  Recommend **#1** for parity with current `_discovery.py` behavior, falling back to
-  #2 if `pi-ai` isn't resolvable.
+### 1. Skills  *(next — higher priority than MCP)*
 
-**0.2 Python streaming client** — `pi_py_sdk/model.py`
-- `class PiModelClient` reusing `Transport` with `argv = [node, <shim path>]`.
-  - `async def stream(self, model, context, *, reasoning=None, **options) -> AsyncIterator[StreamEvent]`
-    — assigns an `id`, routes incoming `stream_event` lines for that `id` to a queue,
-    ends on `stream_done`/`stream_error`. Supports concurrent streams by `id`.
-  - `async def complete(self, model, context, **opts) -> AssistantMessage` — convenience
-    that drains the stream and returns the final message.
-  - `async def list_models(self) -> list[ModelInfo]`.
-  - `async def abort(self, id)`.
-  - lifecycle: `start`/`stop`/async-context-manager, mirroring `PiAgent`.
-- `class PiModelClientSync` — blocking facade (mirror existing `sync.py`).
+Skills are the most valuable remaining feature for the "personal-assistant / second-brain"
+goal: they let you teach the agent workflows and knowledge with **plain markdown**, no
+servers or protocol. They differ from slash commands: slash commands are *user-invoked*;
+skills are *model-aware* via **progressive disclosure** — only each skill's name +
+description sits in the system prompt, and the model reads the full `SKILL.md` (with the
+`read` tool) when a task matches.
 
-**0.3 Pydantic types** — extend `pi_py_sdk/protocol.py` (reuse `TextContent`,
-`ThinkingContent`, `ImageContent`, `ToolCall` which already exist):
-- `Context`, `Message` (`UserMessage`/`AssistantMessage`/`ToolResultMessage`),
-  `Tool` (`{name, description, parameters}`), `Usage`, `Model`/`ModelInfo`.
-- The streaming event union (`start`, `text_start/delta/end`,
-  `thinking_start/delta/end`, `toolcall_start/delta/end`, `done`, `error`) — discriminated
-  on `type`.
+Design (`skills.py`):
+- **Discovery:** `~/.pya/skills/<name>/SKILL.md` (user) and `<cwd>/.pya/skills/<name>/SKILL.md`
+  (project). Frontmatter `name`, `description`; the body is instructions and may reference
+  sibling files/scripts in the skill directory.
+- **Prompt integration:** extend `build_system_prompt(..., skills=...)` to emit an
+  `<available_skills>` block of `{name, description, path}` (mirrors Pi's
+  `formatSkillsForSystemPrompt`). The model reads the path on demand.
+- **Optional UX:** a `/skills` command to list them, and `/skill:<name>` to invoke one
+  directly (like Pi's `enableSkillCommands`).
+- **Tests:** loader (frontmatter parse, discovery, precedence project>user), prompt block
+  assembly; live: a skill whose description triggers the model to read it and follow it.
+- Port reference: `packages/agent/src/harness/skills.ts`,
+  `packages/coding-agent/.../skills.ts`.
 
-**0.4 Tests (pi-py side):** unit-test the shim protocol with a fake stdin/stdout;
-integration test a real one-line `stream` against a cheap model (e.g. Haiku) guarded
-by an env-var/API-key check; test `list_models`; test abort.
+### 2. Compaction
 
-**Deliverable:** `pi-py` gains `PiModelClient` while keeping `PiAgent` intact, and a
-new minor version is tagged so this repo can depend on it.
+Auto-summarize when the conversation nears the model's context window. Implement as a
+`transform_context` hook on the loop (add that seam to `run_agent`), so it's optional and
+swappable. A simple "summarize the oldest turns, keep the most recent K tokens" is enough
+to demonstrate; Pi's branch summarization is advanced. Pairs naturally with sessions
+(persist a `compaction` entry). Port: `packages/agent/src/harness/compaction/`.
 
----
+### 3. Memory / second-brain tools
 
-## Phase 1 — Project scaffolding  *(this repo)*
+The repurposing showcase: `note`, `recall`, `search_memory` over a local store
+(markdown files or sqlite). Demonstrates swapping the coding toolset for an assistant
+toolset via the same registry — directly serves goal (b). Good companion to a
+`docs/building-your-own-agent.md`.
 
-- `pyproject.toml` (uv-managed, matching pi-py conventions): package name
-  `agent` (CLI `pya` or similar), Python ≥3.11.
-- Dependencies: `pi-py` (the extended SDK), `pydantic>=2`, and a light CLI/render
-  layer (`rich` or `prompt_toolkit` — see Phase 7).
-- Layout (mirrors the Pi module boundary so readers can cross-reference):
-  ```
-  src/agent/
-    __init__.py
-    cli.py            # entry point, arg parsing            (← coding-agent/src/cli)
-    app.py            # REPL + one-shot run modes
-    loop.py           # the agent loop                      (← agent/src/agent-loop.ts)
-    types.py          # AgentMessage, events, tool types    (← agent/src/types.ts)
-    model.py          # thin adapter over pi_py_sdk.PiModelClient + registry
-    system_prompt.py  # buildSystemPrompt                   (← coding-agent/.../system-prompt.ts)
-    config.py         # settings load/merge                 (← coding-agent/src/config.ts)
-    render.py         # event → terminal rendering
-    tools/
-      __init__.py     # registry + bundles                 (← coding-agent/.../tools/index.ts)
-      base.py         # Tool protocol, schema, truncation
-      read.py write.py edit.py bash.py grep.py find.py ls.py
-  tests/
-  examples/
-  docs/
-  ```
-- README + CLAUDE.md with the architecture diagram above.
+### 4. `UserPromptSubmit` hook wired into the REPL  *(small)*
+
+The loop already supports `UserPromptSubmit`; wire it in `app.py` so a hook can block a
+prompt or inject context before a turn (e.g. add the current git branch, redact secrets).
+
+### 5. Images / vision
+
+Read-tool image attachments + passing `ImageContent` through to the model (pi-ai already
+supports it). Mostly plumbing.
+
+### 6. Sub-agents / Task tool
+
+A `Task` tool that spawns a child `run_agent` with a restricted toolset and its own
+budget, returning a summary. Enables "scout → plan → implement" style delegation.
+
+### 7. Auto-retry
+
+Wrap a turn in a retry policy for transient model errors (pi-ai surfaces these as a
+terminal `error` event, so it's a clean wrapper). Pi has `retry.enabled/maxRetries`.
+
+### 8. MCP tool servers  *(lower priority than Skills)*
+
+Expose external [MCP](https://modelcontextprotocol.io) tools through the same `Tool`
+protocol (an adapter that lists remote tools and proxies `execute`). Powerful but heavier
+than skills, and less central to the learning/second-brain goals — hence after Skills.
+
+### 9. Polish
+
+Richer TUI (`textual`/`prompt_toolkit`), HTML/markdown transcript export, themes.
 
 ---
 
-## Phase 2 — Core types  *(port `packages/agent/src/types.ts`)*
+## Documentation — proposed `docs/` folder
 
-- `AgentMessage` (the persisted/in-context message: user / assistant / toolResult,
-  with model + usage metadata) vs the LLM-wire `Message` from pi-py. Keep the two
-  distinct, with a `to_llm_messages()` converter (= Pi's `convertToLlm`).
-- Content blocks: text / thinking / image / toolCall (reuse pi-py's).
-- Agent event taxonomy to emit from the loop: `agent_start`, `turn_start`,
-  `message_start/update/end`, `tool_execution_start/update/end`, `turn_end`,
-  `agent_end`. Keep names identical to Pi for familiarity.
-- `Tool` protocol: `name`, `label`, `description`, `prompt_snippet`,
-  `prompt_guidelines`, `parameters` (JSON Schema), `execute(call_id, args, signal, on_update) -> ToolResult`,
-  optional `prepare_arguments`, `execution_mode` ("parallel"|"sequential").
+The repo *is* the example, so docs should explain the design and the extension seams (how
+to add tools/hooks/commands/skills and how to repurpose the agent), not restate the code.
+Suggested files (✅ = ready to write now; ⏳ = after the feature lands):
 
-**Schema choice:** Pi uses TypeBox. In Python, define tool parameters as Pydantic
-models and emit JSON Schema via `.model_json_schema()` — readable and gives free
-validation/coercion (Pi's `validateToolArguments` equivalent).
+| File | What it documents |
+|---|---|
+| `docs/README.md` ✅ | Index/table of contents for the docs. |
+| `docs/architecture.md` ✅ | The pi-ai / pi-agent-core / pi-coding-agent split, the Node shim, the layering diagram, and the turn lifecycle (stream → tool calls → gate → execute → feed back). The "why" behind delegating only the model call. |
+| `docs/getting-started.md` ✅ | Install, Node + `pi` requirement, credentials (provider env var **or** `pi` OAuth login), first run, one-shot vs REPL. |
+| `docs/tools.md` ✅ | The built-in tools, and **how to write a custom tool**: Pydantic params → JSON Schema, `execute`, `ToolResult`, streaming via `on_update`, `execution_mode`, registering via a bundle. The key extension seam. |
+| `docs/permissions.md` ✅ | Modes, rule syntax (`tool`, `tool(glob)`), the approval flow, `allow_always`, and programmatic use of `Permissions`. |
+| `docs/hooks.md` ✅ | Events, decisions, matchers; worked examples (block dangerous bash, post-tool lint feedback, prompt-context injection). |
+| `docs/commands.md` ✅ | Built-in slash commands + authoring custom markdown commands (frontmatter, `$ARGUMENTS`/`$1`, namespacing). |
+| `docs/sessions.md` ✅ | The JSONL format, storage location (`PYA_SESSIONS_DIR`), per-cwd resume, and the linear-log-vs-Pi-tree tradeoff. |
+| `docs/models-and-providers.md` ✅ | How the model layer works via pi-py/pi-ai, the credential-resolution order, switching models (`/model`), and configuring custom/local models (Ollama, LM Studio) via `models.json`. |
+| `docs/configuration.md` ✅ | All env vars (`PYA_SESSIONS_DIR`, `PI_AI_DIR`, `PI_NODE`, provider keys), defaults, and `.pya/` directory layout (commands, skills). |
+| `docs/agent-loop.md` ✅ | A guided read of `loop.py` for learners/contributors: the event queue, turns, gating, parallel/sequential execution, cancellation. |
+| `docs/building-your-own-agent.md` ✅ | The repurposing guide: drive `run_agent` programmatically, swap the toolset, build a second-brain/personal assistant. The headline "starting point" doc. |
+| `docs/skills.md` ⏳ | Authoring `SKILL.md`, discovery, progressive disclosure. Write when Skills land. |
+| `docs/development.md` ✅ | Project layout, running tests (unit vs `-m integration`, `PI_LIVE_LLM`), the optional local-pi-py path dependency, conventions. |
 
----
+(Several of these overlap with README sections; the README stays a quick tour and links
+into `docs/` for depth.)
 
-## Phase 3 — Model adapter  *(thin)*
+## `examples/` folder
 
-- `model.py` wraps `pi_py_sdk.PiModelClient`: resolve a model spec (provider/id),
-  expose `stream(context, tools, reasoning)` returning the typed event stream.
-- A minimal **model registry / config** ported from `model-registry.ts`: read an
-  optional `models.json` to define custom/local models (Ollama, LM Studio) as full
-  `Model` objects with `baseUrl` + `api`. pi-ai handles the rest. Document the
-  credential-resolution order (explicit key → env var → ambient) — all handled by
-  pi-ai, nothing to implement in Python beyond passing an optional `apiKey`.
-
----
-
-## Phase 4 — Tools  *(port `packages/coding-agent/src/core/tools/`)*
-
-Implement the default coding set first: **read, write, edit, bash** (Pi's
-`createCodingToolDefinitions`), then **grep, find, ls** (the read-only extras).
-
-Per-tool notes (schemas + behaviors to match):
-- **read** — `path`, `offset?`, `limit?`; head-truncate to a max line/byte budget;
-  image support optional (defer base64/image attachments to an optional phase).
-- **write** — `path`, `content`; create parent dirs; "new files or full rewrites only".
-- **edit** — `path`, `edits: [{oldText,newText}]`; each `oldText` must match a unique
-  region of the **original** file; handle CRLF/LF/BOM; return a diff in `details`.
-  Include the `prepare_arguments` shim that tolerates `edits` sent as a JSON string.
-- **bash** — `command`, `timeout?` (seconds); stream stdout/stderr via `on_update`;
-  spawn a process group and kill the whole tree on abort/timeout; tail-truncate, spill
-  full output to a temp file when truncated.
-- **grep** — backed by `ripgrep` if present (else a Python fallback). Params:
-  `pattern`, `path?`, `glob?`, `ignoreCase?`, `literal?`, `context?`, `limit?`.
-- **find** — backed by `fd` if present (else `pathlib`/`glob`). `pattern`, `path?`, `limit?`.
-- **ls** — `path?`, `limit?`; alphabetical, `/` suffix for dirs, include dotfiles.
-- **Shared** `tools/base.py`: truncation helpers (max lines / max bytes), path
-  resolution relative to cwd, a consistent `ToolResult{content, details, is_error}`.
-
-**Registry** (`tools/__init__.py`): name→factory map + bundle helpers
-(`coding_tools(cwd)`, `read_only_tools(cwd)`), mirroring `tools/index.ts`. This is the
-seam where second-brain users plug in custom tools.
-
-**Tests:** each tool gets unit tests against a temp dir (golden behaviors:
-truncation, edit uniqueness/failure, bash timeout/kill, grep/find fallbacks).
+**Recommendation: drop it.** The whole repo is the worked example, the README has runnable
+commands, and the extension docs above carry focused snippets (custom tool, hook, command,
+skill, programmatic `run_agent`). A separate `examples/` of scripts would duplicate those
+and drift. The empty `examples/` directory has been removed. If we later want runnable
+end-to-end demos, prefer a single `docs/building-your-own-agent.md` with copy-pasteable
+code over a scripts folder.
 
 ---
 
-## Phase 5 — Agent loop  *(port `packages/agent/src/agent-loop.ts` — the heart)*
+## Testing strategy
 
-- `run_turn` / `run_loop`: nested loop — outer drains follow-up/steering queues, inner
-  runs while there are tool calls or pending messages.
-- Each turn: build `Context{systemPrompt, messages=to_llm(history), tools}`; call
-  `model.stream(...)`; consume events, mutating a `partial` assistant message and
-  emitting `message_update` events for live rendering; collect `toolCall` blocks.
-- **Tool execution orchestration** (port `executeToolCalls`): validate args against
-  the tool's JSON Schema; run **parallel by default**, **sequential** if any called
-  tool is `execution_mode="sequential"` or globally configured; per-call `on_update`
-  emits `tool_execution_update`; catch errors into error results; push `toolResult`
-  messages back into history; honor a `terminate` flag.
-- Hooks (keep, they enable the optional phases cleanly): `before_tool_call` (can
-  **block** with a reason → permissions phase), `after_tool_call` (rewrite result),
-  `transform_context` (→ compaction phase), `prepare_next_turn`, `should_stop_after_turn`.
-- Cancellation: a cooperative `asyncio` cancel/abort that propagates to the model
-  stream (`abort` to the shim) and to running tools.
-
-**Tests:** drive the loop with a **fake model** (scripted event sequences) so the
-loop is testable without network — assert turn structure, parallel vs sequential
-execution, error handling, terminate, and abort. This fake is the single most
-valuable test fixture in the project.
-
----
-
-## Phase 6 — System prompt  *(port `system-prompt.ts`)*
-
-- `build_system_prompt(tools, cwd, *, append=None, project_context=None, custom=None)`:
-  base persona + an **Available tools** list built from each tool's `prompt_snippet`
-  + a deduped **Guidelines** list from `prompt_guidelines` + always-on bullets +
-  current date + cwd. Optional `<project_context>` from an `AGENTS.md`/`CLAUDE.md`
-  file if present. Keep it programmatic (not one big string) so adding a tool updates
-  the prompt automatically.
-
----
-
-## Phase 7 — CLI / REPL / rendering  *(port the interactive mode, minimally)*
-
-- `cli.py`: parse args (model, provider, cwd, one-shot `-p/--print`, `--no-session`).
-- `app.py`: a REPL that reads a line, runs the loop to completion, supports Ctrl-C to
-  abort the current turn; plus a non-interactive one-shot mode for scripting/tests.
-- `render.py`: subscribe to loop events and render streaming assistant text/thinking,
-  tool start/result, and a final usage line. Start simple with `rich`; a fuller TUI
-  (`prompt_toolkit`/`textual`) is an optional upgrade.
-
-**Deliverable after Phase 7: a working, testable coding agent** — read/edit/run code
-in a directory, streamed to the terminal, model served by pi-ai.
-
----
-
-## Testing strategy (cross-cutting)
-
-1. **Unit** — tools (temp dirs), system-prompt assembly, schema validation, message
-   conversion.
-2. **Loop** — against the fake model fixture (no network): turn structure, tool
-   orchestration, abort, terminate, hooks.
-3. **Integration** — a handful of real end-to-end runs against a cheap model
-   (Haiku), gated on an API key, in a scratch git repo: "read this file", "edit this
-   function", "run the tests". Keep these few and deterministic.
-4. **pi-py shim** — protocol tests for `PiModelClient` (Phase 0.4).
-5. **CI** — run unit+loop tests always; integration tests only when a key is present.
-
----
-
-## Optional / nice-to-have phases
-
-These make it a fuller Pi clone but aren't needed for a functional example. Several
-are worth implementing *differently/more simply* than Pi for teaching value — noted
-inline.
-
-- **A. Session persistence.** Pi uses a **tree** of entries (id/parentId, leaf-walk
-  reconstruction) in JSONL under `~/.pi/agent/sessions/`. *Recommendation:* ship a
-  **linear JSONL append log** first (trivial to read/resume) and offer the tree
-  (fork/clone/branch) as an advanced variant. Port target: `packages/agent/src/harness/session/`.
-
-- **B. Compaction.** Auto-summarize when `contextTokens > contextWindow - reserve`.
-  Port `packages/agent/src/harness/compaction/`. *Recommendation:* implement as a
-  `transform_context` hook so it's optional and swappable; a simple "summarize oldest
-  N turns, keep recent K tokens" is enough to demonstrate. Branch summarization is
-  advanced.
-
-- **C. Permissions / approval.** Pi delegates this to extensions via the
-  `before_tool_call` hook; there's no built-in sandbox. *Recommendation:* ship a
-  built-in interactive approval gate for `bash`/`write`/`edit` (confirm before
-  running), configurable allow/deny — this is an important safety layer and a great
-  teaching example of the hook. Reference example extensions: `permission-gate.ts`,
-  `confirm-destructive.ts`, `protected-paths.ts`.
-
-- **D. Slash commands.** `/model`, `/compact`, `/new`, `/resume`, `/quit`, `/help`.
-  Port subset of `slash-commands.ts`. Easy, high UX value.
-
-- **E. Second-brain / memory tools.** The repurposing seam: add `note`, `recall`,
-  `search_memory`, `remember` tools over a local store (sqlite/markdown). Demonstrates
-  swapping the coding toolset for an assistant toolset via the same registry.
-
-- **F. Sub-agents / task delegation.** Pi ships this only as an example extension
-  (separate `pi` process per agent, markdown+frontmatter definitions). Advanced;
-  build on the loop + a `Task` tool that spawns a child loop with a restricted toolset.
-
-- **G. Images / vision.** read-tool image attachments + passing `ImageContent` to the
-  model. pi-ai already supports it; just wire it through.
-
-- **H. Auto-retry** on transient model errors (pi-ai surfaces errors as terminal
-  events; wrap the turn in a retry policy). Pi has `retry.enabled/maxRetries`.
-
-- **I. MCP tool servers.** Expose external MCP tools through the same `Tool` protocol.
-
-- **J. Richer TUI** (textual/prompt_toolkit), HTML export, themes — pure polish.
-
----
-
-## Suggested order
-
-1. **Phase 0** (pi-py `PiModelClient` + shim) — unblocks everything.
-2. Phases 1–3 (scaffold, types, model adapter).
-3. Phase 4 (tools) + Phase 5 (loop) in tandem, against the fake-model fixture.
-4. Phase 6 (prompt) + Phase 7 (CLI/REPL) → **functional agent**.
-5. Then optional phases by value: **C (permissions) → D (slash) → A (sessions) →
-   B (compaction) → E (memory) → others**.
-</content>
-</invoke>
+1. **Unit** — tools (temp dirs), prompt assembly, schema validation, message conversion,
+   permissions, hooks, commands, sessions.
+2. **Loop** — against the **fake-model fixture** (scripted `StreamEvent` turns, no
+   network): turn structure, parallel/sequential exec, gating, error/abort, max-turns.
+3. **Integration** — a few real runs against a cheap model (Haiku), gated on
+   `PI_LIVE_LLM=1`: tool round-trip, an end-to-end file edit, cross-process session resume.
+4. **CI** — unit + loop always; integration only when credentials are present.
