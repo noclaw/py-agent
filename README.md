@@ -10,9 +10,9 @@ a clean starting point for personal-assistant / second-brain agents (swap the co
 toolset for your own).
 
 > **Status:** working end to end — the full tool set (read/write/edit/bash/grep/find/ls),
-> the agent loop, system prompt, interactive CLI/REPL, **permissions**, **hooks**, and
-> **slash commands** with custom markdown commands (all modeled on Claude Code). Next:
-> sessions, compaction, memory tools. See [`PLAN.md`](PLAN.md).
+> the agent loop, system prompt, interactive CLI/REPL, **permissions**, **hooks**, **slash
+> commands** with custom markdown commands, and **session** save/resume (all modeled on
+> Claude Code). Next: compaction, memory tools. See [`PLAN.md`](PLAN.md).
 
 ## Architecture
 
@@ -78,6 +78,8 @@ In the REPL, lines starting with `/` are commands. Built-ins:
 | `/tools` | list the available tools |
 | `/model [provider/]model` | show or switch the model |
 | `/mode <mode>` | show or set the permission mode |
+| `/sessions` | list saved sessions for this directory |
+| `/resume <id>` | resume a saved session |
 | `/exit`, `/quit` | leave |
 
 **Custom commands** are markdown files (just like Claude Code's `.claude/commands/`):
@@ -95,6 +97,21 @@ Read $1 and review it for bugs and edge cases. Be concise.
 ```
 
 Then `/review src/agent/loop.py` runs that prompt as a turn.
+
+## Sessions
+
+Conversations are saved to `~/.pya/sessions/<id>.jsonl` (override with
+`PYA_SESSIONS_DIR`), one per conversation, tagged with the working directory so resume is
+per-project.
+
+```bash
+uv run pya -c                 # continue the most recent session for this directory
+uv run pya --resume <id>      # resume a specific session
+uv run pya --no-session       # don't save this conversation
+```
+
+It works one-shot too — `pya -c -p "..."` continues a prior conversation non-interactively.
+In the REPL, `/sessions` lists them and `/resume <id>` loads one (and restores its model).
 
 ## Permissions
 

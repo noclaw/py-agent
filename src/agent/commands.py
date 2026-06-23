@@ -24,6 +24,7 @@ from .types import AgentMessage, Tool
 
 if TYPE_CHECKING:
     from .model import Model
+    from .sessions import Session, SessionStore
 
 __all__ = [
     "CommandContext",
@@ -45,6 +46,9 @@ class CommandContext:
     permissions: Permissions
     model: "Model"
     registry: "SlashRegistry"
+    store: "SessionStore | None" = None
+    session: "Session | None" = None
+    cwd: str = "."
 
 
 @dataclass
@@ -108,7 +112,49 @@ def _cmd_help(ctx: CommandContext, args: str) -> CommandOutcome:
 
 def _cmd_clear(ctx: CommandContext, args: str) -> CommandOutcome:
     ctx.history.clear()
+    if ctx.store is not None:  # subsequent messages go to a fresh session file
+        ctx.session = ctx.store.create(ctx.cwd, ctx.model.name)
     ctx.console.print("[dim]conversation cleared[/dim]")
+    return CommandOutcome()
+
+
+def _cmd_sessions(ctx: CommandContext, args: str) -> CommandOutcome:
+    if ctx.store is None:
+        ctx.console.print("[dim]sessions are disabled[/dim]")
+        return CommandOutcome()
+    infos = ctx.store.list(ctx.cwd)
+    if not infos:
+        ctx.console.print("[dim]no saved sessions for this directory[/dim]")
+        return CommandOutcome()
+    ctx.console.print("[bold]Sessions[/bold] [dim](newest first)[/dim]")
+    for info in infos:
+        current = " [green](current)[/green]" if ctx.session and info.id == ctx.session.id else ""
+        ctx.console.print(
+            f"  [cyan]{info.id}[/cyan] [dim]{info.messages} msgs[/dim] {info.preview}{current}"
+        )
+    ctx.console.print("[dim]resume with /resume <id>[/dim]")
+    return CommandOutcome()
+
+
+def _cmd_resume(ctx: CommandContext, args: str) -> CommandOutcome:
+    if ctx.store is None:
+        ctx.console.print("[dim]sessions are disabled[/dim]")
+        return CommandOutcome()
+    if not args:
+        return _cmd_sessions(ctx, "")
+    try:
+        header, messages, session = ctx.store.load(args)
+    except FileNotFoundError:
+        ctx.console.print(f"[red]session not found:[/red] {args}")
+        return CommandOutcome()
+    ctx.history.clear()
+    ctx.history.extend(messages)
+    ctx.session = session
+    model = header.get("model")
+    if model and "/" in model:
+        provider, name = model.split("/", 1)
+        ctx.model.set_model(name, provider)
+    ctx.console.print(f"[dim]resumed {session.id} — {len(messages)} messages[/dim]")
     return CommandOutcome()
 
 
@@ -156,6 +202,8 @@ def _builtin_commands() -> list[SlashCommand]:
         SlashCommand("tools", "list the available tools", _cmd_tools),
         SlashCommand("model", "show or switch the model", _cmd_model, argument_hint="[provider/]model"),
         SlashCommand("mode", "show or set the permission mode", _cmd_mode, argument_hint="<mode>"),
+        SlashCommand("sessions", "list saved sessions for this directory", _cmd_sessions),
+        SlashCommand("resume", "resume a saved session", _cmd_resume, argument_hint="<id>"),
     ]
 
 

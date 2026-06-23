@@ -36,6 +36,8 @@ __all__ = [
     "AgentMessage",
     "user_message",
     "tool_result_message",
+    "message_to_wire",
+    "message_from_wire",
     "to_llm_messages",
     "ToolResult",
     "Tool",
@@ -135,19 +137,47 @@ def _assistant_to_wire(message: "AssistantMessage") -> dict[str, Any]:
     raise TypeError(f"Unexpected assistant message type: {type(message)!r}")
 
 
+def message_to_wire(message: AgentMessage) -> dict[str, Any]:
+    """Serialize one history message to its pi-ai wire dict (used by the model and by
+    session persistence)."""
+    if isinstance(message, (UserMessage, ToolResultMessage)):
+        return message.to_wire()
+    return _assistant_to_wire(message)
+
+
+def _text_of(content: Any) -> str:
+    """Pull plain text out of a string or a list of content blocks."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text")
+    return ""
+
+
+def message_from_wire(data: dict[str, Any]) -> AgentMessage:
+    """Reconstruct a history message from its wire dict (inverse of :func:`message_to_wire`)."""
+    role = data.get("role")
+    timestamp = data.get("timestamp") or now_ms()
+    if role == "user":
+        return UserMessage(content=_text_of(data.get("content", "")), timestamp=timestamp)
+    if role == "toolResult":
+        return ToolResultMessage(
+            tool_call_id=data.get("toolCallId", ""),
+            tool_name=data.get("toolName", ""),
+            content=_text_of(data.get("content", "")),
+            is_error=bool(data.get("isError")),
+            timestamp=timestamp,
+        )
+    return AssistantMessage.model_validate(data)  # assistant: full fidelity
+
+
 def to_llm_messages(history: list[AgentMessage]) -> list[dict[str, Any]]:
     """Convert conversation history to the pi-ai wire messages the model consumes.
 
     This is the ``convertToLlm`` seam: it's where in-memory message objects become the
     list passed to :meth:`pi_py_sdk.model.PiModelClient.stream`.
     """
-    wire: list[dict[str, Any]] = []
-    for message in history:
-        if isinstance(message, (UserMessage, ToolResultMessage)):
-            wire.append(message.to_wire())
-        else:  # assistant (pi-ai model or raw dict)
-            wire.append(_assistant_to_wire(message))
-    return wire
+    return [message_to_wire(message) for message in history]
 
 
 # ---------------------------------------------------------------------------

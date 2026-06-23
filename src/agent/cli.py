@@ -58,6 +58,24 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Skip all permission prompts (alias for --permission-mode bypass).",
     )
     parser.add_argument(
+        "-c",
+        "--continue",
+        dest="continue_session",
+        action="store_true",
+        help="Resume the most recent session for this directory.",
+    )
+    parser.add_argument(
+        "--resume",
+        metavar="SESSION_ID",
+        default=None,
+        help="Resume a specific session by id.",
+    )
+    parser.add_argument(
+        "--no-session",
+        action="store_true",
+        help="Don't save this conversation to disk.",
+    )
+    parser.add_argument(
         "-p",
         "--print",
         dest="prompt",
@@ -115,6 +133,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         cwd=args.cwd,
         prompt=args.prompt,
         permission_mode=permission_mode,
+        continue_session=args.continue_session,
+        resume=args.resume,
+        no_session=args.no_session,
     )
 
 
