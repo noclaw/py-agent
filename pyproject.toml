@@ -1,0 +1,58 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "py-coding-agent"
+version = "0.0.1"
+description = "A readable Python coding agent — native loop and tools, model layer via pi-py/pi-ai"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Jeff Jacobsen" }]
+keywords = ["pi", "agent", "llm", "coding-agent", "assistant", "second-brain"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "pi-py-sdk>=0.2.0",
+    "pydantic>=2.6,<3",
+    "rich>=13",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+]
+
+[project.scripts]
+pycoda = "coding_agent.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/noclaw/py-coding-agent"
+
+# pi-py-sdk 0.2.0 is not on PyPI yet; resolve it from the local checkout (editable so
+# changes to the shim/client are picked up without reinstalling).
+[tool.uv.sources]
+pi-py-sdk = { path = "../pi-py", editable = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/coding_agent"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+# Integration tests (real Node + pi-ai) are opt-in: run them with `pytest -m integration`.
+addopts = "-m 'not integration'"
+markers = [
+    "integration: requires Node + the pi-ai runtime (run with -m integration)",
+]
