@@ -1,4 +1,4 @@
-# py-coding-agent
+# py-agent
 
 A readable Python port of the [Pi](https://pi.dev) coding agent. The **agent loop and
 tools are written in Python** here; the **model layer** (30+ providers, OAuth, transports,

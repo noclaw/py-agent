@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "py-coding-agent"
+name = "py-agent"
 version = "0.0.1"
 description = "A readable Python coding agent — native loop and tools, model layer via pi-py/pi-ai"
 readme = "README.md"
@@ -38,7 +38,7 @@ dev = [
 pycoda = "coding_agent.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/noclaw/py-coding-agent"
+Homepage = "https://github.com/noclaw/py-agent"
 
 # pi-py-sdk 0.2.0 is not on PyPI yet; resolve it from the local checkout (editable so
 # changes to the shim/client are picked up without reinstalling).

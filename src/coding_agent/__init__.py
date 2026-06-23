@@ -1,4 +1,4 @@
-"""py-coding-agent: a readable Python coding agent.
+"""py-agent: a readable Python coding agent.
 
 The agent **loop and tools are written in Python** (this package); the **model layer**
 — providers, auth, transports, local models — is delegated to Pi's ``pi-ai`` through the

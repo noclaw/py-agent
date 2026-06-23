@@ -65,7 +65,7 @@ async def _run_repl(*, provider: str, model: str, reasoning: str | None, cwd: st
     renderer = Renderer(console)
 
     async with open_model(provider=provider, model=model, reasoning=reasoning) as m:
-        console.print(f"[bold]py-coding-agent[/bold] [dim]({m.name}, cwd={cwd})[/dim]")
+        console.print(f"[bold]py-agent[/bold] [dim]({m.name}, cwd={cwd})[/dim]")
         console.print("[dim]Type a message, or /help. Ctrl-D to quit.[/dim]\n")
         while True:
             try:

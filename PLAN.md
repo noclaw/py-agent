@@ -1,4 +1,4 @@
-# py-coding-agent — Implementation Plan
+# py-agent — Implementation Plan
 
 A Python port of the Pi coding-agent. The **agent loop and tools are written in
 readable Python**; the **model/provider/streaming/auth layer is delegated to Pi's

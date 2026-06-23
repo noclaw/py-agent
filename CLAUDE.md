@@ -4,7 +4,7 @@ Guidance for working in this repository.
 
 ## What this is
 
-`py-coding-agent` is a Python port of the Pi coding agent. **The agent loop and tools are
+`py-agent` is a Python port of the Pi coding agent. **The agent loop and tools are
 written in Python here**; the **model layer** is delegated to Pi's `pi-ai` via the
 `pi-py` SDK (`PiModelClient`). It is an *example implementation* — optimized for being
 read and modified (learning Python; a base for assistant / second-brain agents), not for

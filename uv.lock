@@ -85,7 +85,7 @@ wheels = [
 ]
 
 [[package]]
-name = "py-coding-agent"
+name = "py-agent"
 version = "0.0.1"
 source = { editable = "." }
 dependencies = [
