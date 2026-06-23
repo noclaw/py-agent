@@ -178,6 +178,14 @@ def block_force_push(event):
 A `PreToolUse` hook can `allow` (skip the permission check) or `deny` (block) a call;
 `PostToolUse` can attach `additional_context` fed back to the model.
 
+## Documentation
+
+Deeper guides live in [`docs/`](docs/README.md): [architecture](docs/architecture.md), the
+[agent loop](docs/agent-loop.md), writing [tools](docs/tools.md) / [hooks](docs/hooks.md) /
+[commands](docs/commands.md) / [skills](docs/skills.md), [permissions](docs/permissions.md),
+[sessions](docs/sessions.md), [models & providers](docs/models-and-providers.md), and
+[building your own agent](docs/building-your-own-agent.md).
+
 ## Develop
 
 ```bash
