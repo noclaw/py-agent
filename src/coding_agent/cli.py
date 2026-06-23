@@ -32,6 +32,25 @@ def _build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_PROVIDER,
         help=f"Provider id (default: {DEFAULT_PROVIDER}).",
     )
+    parser.add_argument(
+        "--reasoning",
+        default=None,
+        choices=["minimal", "low", "medium", "high", "xhigh"],
+        help="Thinking level (default: provider default).",
+    )
+    parser.add_argument(
+        "--cwd",
+        default=".",
+        help="Working directory the agent operates in (default: current directory).",
+    )
+    parser.add_argument(
+        "-p",
+        "--print",
+        dest="prompt",
+        default=None,
+        metavar="PROMPT",
+        help="Run a single prompt non-interactively and exit (otherwise start a REPL).",
+    )
 
     sub = parser.add_subparsers(dest="command")
 
@@ -71,10 +90,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "models":
         return _cmd_models(args.provider)
 
-    # Default: launch the interactive app (currently a roadmap stub).
+    # Default: one-shot if -p was given, otherwise the interactive REPL.
     from .app import run
 
-    return run(provider=args.provider, model=args.model)
+    return run(
+        provider=args.provider,
+        model=args.model,
+        reasoning=args.reasoning,
+        cwd=args.cwd,
+        prompt=args.prompt,
+    )
 
 
 if __name__ == "__main__":

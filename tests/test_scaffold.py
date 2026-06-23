@@ -23,6 +23,16 @@ def test_cli_parser_defaults():
     args = parser.parse_args([])
     assert args.command is None
     assert args.provider == "anthropic"
+    assert args.prompt is None  # REPL by default
+    assert args.cwd == "."
+
+
+def test_cli_parses_one_shot_flags():
+    parser = _build_parser()
+    args = parser.parse_args(["-p", "hello", "--cwd", "/tmp", "--reasoning", "low"])
+    assert args.prompt == "hello"
+    assert args.cwd == "/tmp"
+    assert args.reasoning == "low"
 
 
 def test_cli_version_exits_zero(capsys):
@@ -30,8 +40,3 @@ def test_cli_version_exits_zero(capsys):
         main(["--version"])
     assert exc.value.code == 0
     assert "pycoda" in capsys.readouterr().out
-
-
-def test_default_command_runs_stub(capsys):
-    assert main([]) == 0
-    assert "scaffold" in capsys.readouterr().out.lower()

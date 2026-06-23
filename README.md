@@ -9,9 +9,10 @@ It's meant as an example implementation — small enough to read while learning 
 a clean starting point for personal-assistant / second-brain agents (swap the coding
 toolset for your own).
 
-> **Status:** the core works — message types, the default tools (read/write/edit/bash),
-> and the agent loop are implemented and tested (incl. a live end-to-end run). Still to
-> come: the system prompt and the interactive CLI/REPL. See [`PLAN.md`](PLAN.md).
+> **Status:** working end to end — message types, the default tools (read/write/edit/bash),
+> the agent loop, the system prompt, and the interactive CLI/REPL are implemented and
+> tested. Optional features (sessions, compaction, permissions, slash/memory commands)
+> are next. See [`PLAN.md`](PLAN.md).
 
 ## Architecture
 
@@ -56,9 +57,15 @@ uv sync --extra dev
 
 ```bash
 uv run pycoda --version
-uv run pycoda models --provider anthropic   # lists models — proves the pi-ai pipeline
-uv run pycoda                                # interactive agent (stubbed until later phases)
+uv run pycoda models --provider anthropic        # list models (smoke-tests the pipeline)
+uv run pycoda -p "What does this project do?"     # one-shot: run a prompt and exit
+uv run pycoda                                      # interactive REPL (Ctrl-C aborts a turn, Ctrl-D quits)
+uv run pycoda --cwd /path/to/project --model claude-sonnet-4-6
 ```
+
+In the REPL, `/help` lists commands, `/clear` resets the conversation, `/exit` quits.
+The agent streams its reply, shows each tool call (`› bash …`) and result (`✓`/`✗`), and
+prints a token summary when the turn finishes.
 
 ## Develop
 
