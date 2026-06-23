@@ -13,7 +13,7 @@ import shutil
 
 import pytest
 
-from coding_agent.types import to_llm_messages, tool_result_message, user_message
+from agent.types import to_llm_messages, tool_result_message, user_message
 from pi_py_sdk import PiModelClient
 
 pytestmark = [

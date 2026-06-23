@@ -4,7 +4,7 @@ Port target: ``packages/coding-agent/src/core/tools/index.ts``.
 
 ``coding_tools(cwd)`` returns the default coding set (read/write/edit/bash). This package
 is the seam where second-brain / assistant users swap the coding toolset for their own
-(e.g. note/recall/memory tools) — build a list of :class:`~coding_agent.types.Tool`
+(e.g. note/recall/memory tools) — build a list of :class:`~agent.types.Tool`
 instances and hand it to ``run_agent``.
 
 (grep/find/ls are planned follow-ups to the default set.)

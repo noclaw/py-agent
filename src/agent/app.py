@@ -1,10 +1,10 @@
 """Interactive REPL and one-shot runner.
 
 Wires the pieces together: build the system prompt, open a model, and drive
-:func:`coding_agent.loop.run_agent`, rendering events as they stream. Two modes:
+:func:`agent.loop.run_agent`, rendering events as they stream. Two modes:
 
-* one-shot (``pycoda -p "do X"``) — run a single prompt and exit.
-* REPL (``pycoda``) — a multi-turn conversation; the history persists across turns, so
+* one-shot (``pya -p "do X"``) — run a single prompt and exit.
+* REPL (``pya``) — a multi-turn conversation; the history persists across turns, so
   the agent remembers what it just did. Ctrl-C aborts the current turn; Ctrl-D / ``/exit``
   quits.
 """

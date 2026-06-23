@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from coding_agent.loop import run_agent
-from coding_agent.types import (
+from agent.loop import run_agent
+from agent.types import (
     AgentEnd,
     AgentStart,
     AssistantDone,

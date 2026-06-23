@@ -105,12 +105,12 @@ new minor version is tagged so this repo can depend on it.
 ## Phase 1 — Project scaffolding  *(this repo)*
 
 - `pyproject.toml` (uv-managed, matching pi-py conventions): package name
-  `coding_agent` (CLI `pycoda` or similar), Python ≥3.11.
+  `agent` (CLI `pya` or similar), Python ≥3.11.
 - Dependencies: `pi-py` (the extended SDK), `pydantic>=2`, and a light CLI/render
   layer (`rich` or `prompt_toolkit` — see Phase 7).
 - Layout (mirrors the Pi module boundary so readers can cross-reference):
   ```
-  src/coding_agent/
+  src/agent/
     __init__.py
     cli.py            # entry point, arg parsing            (← coding-agent/src/cli)
     app.py            # REPL + one-shot run modes

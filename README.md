@@ -56,11 +56,11 @@ uv sync --extra dev
 ## Try it
 
 ```bash
-uv run pycoda --version
-uv run pycoda models --provider anthropic        # list models (smoke-tests the pipeline)
-uv run pycoda -p "What does this project do?"     # one-shot: run a prompt and exit
-uv run pycoda                                      # interactive REPL (Ctrl-C aborts a turn, Ctrl-D quits)
-uv run pycoda --cwd /path/to/project --model claude-sonnet-4-6
+uv run pya --version
+uv run pya models --provider anthropic        # list models (smoke-tests the pipeline)
+uv run pya -p "What does this project do?"     # one-shot: run a prompt and exit
+uv run pya                                      # interactive REPL (Ctrl-C aborts a turn, Ctrl-D quits)
+uv run pya --cwd /path/to/project --model claude-sonnet-4-6
 ```
 
 In the REPL, `/help` lists commands, `/clear` resets the conversation, `/exit` quits.

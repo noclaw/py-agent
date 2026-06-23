@@ -1,4 +1,4 @@
-"""Command-line entry point (``pycoda``).
+"""Command-line entry point (``pya``).
 
 Phase 1 wires a runnable skeleton: ``--version``, a ``models`` smoke command that proves
 the whole stack (this package -> pi-py -> Node shim -> pi-ai) works end to end, and a
@@ -18,10 +18,10 @@ from .config import DEFAULT_MODEL, DEFAULT_PROVIDER
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="pycoda",
+        prog="pya",
         description="A readable Python coding agent (model layer via pi-py/pi-ai).",
     )
-    parser.add_argument("--version", action="version", version=f"pycoda {__version__}")
+    parser.add_argument("--version", action="version", version=f"pya {__version__}")
     parser.add_argument(
         "--model",
         default=DEFAULT_MODEL,

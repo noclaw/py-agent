@@ -6,8 +6,8 @@ import io
 
 from rich.console import Console
 
-from coding_agent.render import Renderer
-from coding_agent.types import (
+from agent.render import Renderer
+from agent.types import (
     AgentEnd,
     AgentStart,
     AssistantDelta,

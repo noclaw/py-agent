@@ -6,7 +6,7 @@ The agent **loop and tools are written in Python** (this package); the **model l
 
 It is meant as an example implementation: small enough to read while learning Python,
 and a clean starting point for personal-assistant / second-brain agents (swap the
-coding toolset for your own via :mod:`coding_agent.tools`).
+coding toolset for your own via :mod:`agent.tools`).
 
 See ``PLAN.md`` for the phased roadmap.
 """

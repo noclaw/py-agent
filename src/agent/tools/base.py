@@ -1,7 +1,7 @@
 """Shared tool plumbing.
 
-The :class:`~coding_agent.types.Tool` protocol and :class:`~coding_agent.types.ToolResult`
-live in :mod:`coding_agent.types` (re-exported here). This module adds the helpers the
+The :class:`~agent.types.Tool` protocol and :class:`~agent.types.ToolResult`
+live in :mod:`agent.types` (re-exported here). This module adds the helpers the
 concrete tools share: a working-directory base, path resolution, and output truncation.
 
 Port target: ``packages/coding-agent/src/core/tools/`` (``truncate.ts``, ``path-utils.ts``).

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from coding_agent.types import (
+from agent.types import (
     AssistantDelta,
     Tool,
     ToolResult,

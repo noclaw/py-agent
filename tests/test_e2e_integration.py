@@ -10,10 +10,10 @@ import shutil
 
 import pytest
 
-from coding_agent.loop import run_agent
-from coding_agent.model import open_model
-from coding_agent.tools import coding_tools
-from coding_agent.types import AgentEnd, user_message
+from agent.loop import run_agent
+from agent.model import open_model
+from agent.tools import coding_tools
+from agent.types import AgentEnd, user_message
 
 pytestmark = [
     pytest.mark.integration,

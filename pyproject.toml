@@ -35,18 +35,13 @@ dev = [
 ]
 
 [project.scripts]
-pycoda = "coding_agent.cli:main"
+pya = "agent.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/noclaw/py-agent"
 
-# pi-py-sdk 0.2.0 is not on PyPI yet; resolve it from the local checkout (editable so
-# changes to the shim/client are picked up without reinstalling).
-[tool.uv.sources]
-pi-py-sdk = { path = "../pi-py", editable = true }
-
 [tool.hatch.build.targets.wheel]
-packages = ["src/coding_agent"]
+packages = ["src/agent"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

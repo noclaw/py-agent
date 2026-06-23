@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from coding_agent.system_prompt import build_system_prompt, load_project_context
-from coding_agent.types import Tool, ToolResult
+from agent.system_prompt import build_system_prompt, load_project_context
+from agent.types import Tool, ToolResult
 
 
 class _Args(BaseModel):

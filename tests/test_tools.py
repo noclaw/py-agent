@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from coding_agent.tools.bash import BashArgs, BashTool
-from coding_agent.tools.edit import EditArgs, EditOp, EditTool
-from coding_agent.tools.read import ReadArgs, ReadTool
-from coding_agent.tools.write import WriteArgs, WriteTool
+from agent.tools.bash import BashArgs, BashTool
+from agent.tools.edit import EditArgs, EditOp, EditTool
+from agent.tools.read import ReadArgs, ReadTool
+from agent.tools.write import WriteArgs, WriteTool
 
 
 # --- read ------------------------------------------------------------------

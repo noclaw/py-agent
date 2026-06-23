@@ -2,7 +2,7 @@
 
 Port target: ``packages/agent/src/agent-loop.ts``.
 
-``run_agent`` is an async generator of :mod:`~coding_agent.types` events. Each turn it
+``run_agent`` is an async generator of :mod:`~agent.types` events. Each turn it
 streams one assistant response, executes any tool calls the model made, feeds the results
 back into the conversation, and repeats until the model stops calling tools (or an error /
 turn cap / cancellation ends the run). It mutates ``history`` in place so the caller keeps

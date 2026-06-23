@@ -62,18 +62,14 @@ wheels = [
 [[package]]
 name = "pi-py-sdk"
 version = "0.2.0"
-source = { editable = "../pi-py" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "pydantic", specifier = ">=2.6,<3" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23" },
+sdist = { url = "https://files.pythonhosted.org/packages/96/29/1de6a2f2b4dca9b59eb619a2d6dca094b58380314272268805d8adb92a62/pi_py_sdk-0.2.0.tar.gz", hash = "sha256:723fae8dc289b7093c727504489107a1d819e30e2aad55594575af5f8eec47d0", size = 49532, upload-time = "2026-06-23T21:44:13.096Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/90/bb/074de513719cf9d853d7eab9eb0b13ff2ad2c499e89de047b04b90732182/pi_py_sdk-0.2.0-py3-none-any.whl", hash = "sha256:d6adff00fcfb3dc3d92bcf16ce7787985b66180b2deee728679614f55078d22c", size = 37949, upload-time = "2026-06-23T21:44:11.682Z" },
 ]
-provides-extras = ["dev"]
 
 [[package]]
 name = "pluggy"
@@ -102,7 +98,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "pi-py-sdk", editable = "../pi-py" },
+    { name = "pi-py-sdk", specifier = ">=0.2.0" },
     { name = "pydantic", specifier = ">=2.6,<3" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23" },

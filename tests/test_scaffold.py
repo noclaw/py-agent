@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import pytest
 
-import coding_agent
-from coding_agent.cli import _build_parser, main
+import agent
+from agent.cli import _build_parser, main
 
 
 def test_version_is_exposed():
-    assert isinstance(coding_agent.__version__, str)
-    assert coding_agent.__version__
+    assert isinstance(agent.__version__, str)
+    assert agent.__version__
 
 
 def test_pi_py_is_importable():
@@ -39,4 +39,4 @@ def test_cli_version_exits_zero(capsys):
     with pytest.raises(SystemExit) as exc:
         main(["--version"])
     assert exc.value.code == 0
-    assert "pycoda" in capsys.readouterr().out
+    assert "pya" in capsys.readouterr().out

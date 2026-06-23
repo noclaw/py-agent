@@ -18,8 +18,8 @@ the whole point of writing it here.
 ## Layout
 
 ```
-src/coding_agent/
-  cli.py            # `pycoda` entry point                 (← coding-agent/src/cli)
+src/agent/
+  cli.py            # `pya` entry point                 (← coding-agent/src/cli)
   app.py            # REPL + one-shot runner
   loop.py           # the agent loop                       (← agent/src/agent-loop.ts)
   types.py          # AgentMessage, events, Tool protocol  (← agent/src/types.ts)
