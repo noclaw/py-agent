@@ -19,7 +19,9 @@ from typing import TYPE_CHECKING, Callable
 
 from rich.console import Console
 
+from ._markdown import parse_frontmatter
 from .permissions import PermissionMode, Permissions
+from .skills import Skill, discover_skills
 from .types import AgentMessage, Tool
 
 if TYPE_CHECKING:
@@ -212,22 +214,6 @@ def _builtin_commands() -> list[SlashCommand]:
 # ---------------------------------------------------------------------------
 
 
-def _parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
-    """Split a leading ``---`` YAML-ish block (simple ``key: value`` lines) from the body."""
-    if not text.startswith("---"):
-        return {}, text
-    end = text.find("\n---", 3)
-    if end == -1:
-        return {}, text
-    meta: dict[str, str] = {}
-    for line in text[3:end].strip().splitlines():
-        if ":" in line:
-            key, value = line.split(":", 1)
-            meta[key.strip()] = value.strip()
-    body = text[end + 4 :].lstrip("\n")
-    return meta, body
-
-
 def _expand(template: str, args: str) -> str:
     """Substitute ``$ARGUMENTS`` (all args) and ``$1``, ``$2``, … (positional)."""
     out = template.replace("$ARGUMENTS", args)
@@ -239,7 +225,7 @@ def _expand(template: str, args: str) -> str:
 
 
 def _make_markdown_command(path: Path, base: Path) -> SlashCommand:
-    meta, body = _parse_frontmatter(path.read_text(encoding="utf-8"))
+    meta, body = parse_frontmatter(path.read_text(encoding="utf-8"))
     name = path.relative_to(base).with_suffix("").as_posix().replace("/", ":")
     description = meta.get("description") or f"custom command from {path.name}"
 
@@ -261,8 +247,49 @@ def load_markdown_commands(dirs: list[Path]) -> list[SlashCommand]:
     return commands
 
 
-def build_registry(cwd: str | Path = ".", *, extra_dirs: list[Path] | None = None) -> SlashRegistry:
-    """Build a registry: custom markdown commands first, then built-ins (which win on name).
+# ---------------------------------------------------------------------------
+# Skill commands (/skills list, /skill:<name> invoke)
+# ---------------------------------------------------------------------------
+
+
+def _make_skills_command(skills: list[Skill]) -> SlashCommand:
+    def run(ctx: CommandContext, args: str) -> CommandOutcome:
+        if not skills:
+            ctx.console.print("[dim]no skills found (add SKILL.md under .pya/skills/<name>/)[/dim]")
+            return CommandOutcome()
+        ctx.console.print("[bold]Skills[/bold]")
+        for skill in skills:
+            ctx.console.print(
+                f"  [cyan]{skill.name}[/cyan] — {skill.description} [dim]({skill.source})[/dim]"
+            )
+        ctx.console.print("[dim]invoke with /skill:<name>, or just describe a matching task[/dim]")
+        return CommandOutcome()
+
+    return SlashCommand("skills", "list available skills", run)
+
+
+def _make_skill_command(skill: Skill) -> SlashCommand:
+    def run(ctx: CommandContext, args: str) -> CommandOutcome:
+        # Read the SKILL.md body on demand and run it as a prompt (with arg substitution).
+        try:
+            _meta, body = parse_frontmatter(skill.path.read_text(encoding="utf-8"))
+        except OSError as exc:
+            ctx.console.print(f"[red]could not read skill {skill.name}:[/red] {exc}")
+            return CommandOutcome()
+        return CommandOutcome(prompt=_expand(body, args).strip())
+
+    return SlashCommand(
+        f"skill:{skill.name}", skill.description or f"skill {skill.name}", run, custom=True
+    )
+
+
+def build_registry(
+    cwd: str | Path = ".",
+    *,
+    extra_dirs: list[Path] | None = None,
+    skills: list[Skill] | None = None,
+) -> SlashRegistry:
+    """Build a registry: custom markdown + skill commands first, then built-ins (which win).
 
     Project commands (``<cwd>/.pya/commands``) override user commands
     (``~/.pya/commands``); built-ins always take precedence over custom.
@@ -278,6 +305,12 @@ def build_registry(cwd: str | Path = ".", *, extra_dirs: list[Path] | None = Non
     for command in custom.values():
         registry.register(command)
 
+    if skills is None:
+        skills = discover_skills(cwd)
+    for skill in skills:
+        registry.register(_make_skill_command(skill))
+
     for command in _builtin_commands():
         registry.register(command)
+    registry.register(_make_skills_command(skills))  # after built-ins: needs the skills list
     return registry

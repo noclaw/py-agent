@@ -74,6 +74,9 @@ client) left untouched.
   with `$ARGUMENTS`/`$1` + frontmatter. `commands.py`.
 - ✅ **Sessions** — linear JSONL save/resume per directory; `-c`/`--resume`/`--no-session`.
   `sessions.py`.
+- ✅ **Skills** — progressive-disclosure `SKILL.md` under `.pya/skills/<name>/`; name +
+  description injected into the system prompt, full file read on demand; `/skills` and
+  `/skill:<name>`. `skills.py`.
 
 **Tests:** ~90 unit (driven by a scripted fake-model fixture, no network) + a few gated
 live integration tests (`PI_LIVE_LLM=1`).
@@ -82,14 +85,13 @@ live integration tests (`PI_LIVE_LLM=1`).
 
 ## Remaining / optional phases (by recommended priority)
 
-### 1. Skills  *(next — higher priority than MCP)*
+### Skills ✅ *(done — `skills.py`)*
 
-Skills are the most valuable remaining feature for the "personal-assistant / second-brain"
-goal: they let you teach the agent workflows and knowledge with **plain markdown**, no
-servers or protocol. They differ from slash commands: slash commands are *user-invoked*;
-skills are *model-aware* via **progressive disclosure** — only each skill's name +
-description sits in the system prompt, and the model reads the full `SKILL.md` (with the
-`read` tool) when a task matches.
+Implemented as designed below. Skills let you teach the agent workflows and knowledge with
+**plain markdown**, no servers or protocol — they differ from slash commands
+(user-invoked): skills are *model-aware* via **progressive disclosure** — only each skill's
+name + description sits in the system prompt, and the model reads the full `SKILL.md` (with
+the `read` tool) when a task matches.
 
 Design (`skills.py`):
 - **Discovery:** `~/.pya/skills/<name>/SKILL.md` (user) and `<cwd>/.pya/skills/<name>/SKILL.md`
@@ -172,7 +174,7 @@ Suggested files (✅ = ready to write now; ⏳ = after the feature lands):
 | `docs/configuration.md` ✅ | All env vars (`PYA_SESSIONS_DIR`, `PI_AI_DIR`, `PI_NODE`, provider keys), defaults, and `.pya/` directory layout (commands, skills). |
 | `docs/agent-loop.md` ✅ | A guided read of `loop.py` for learners/contributors: the event queue, turns, gating, parallel/sequential execution, cancellation. |
 | `docs/building-your-own-agent.md` ✅ | The repurposing guide: drive `run_agent` programmatically, swap the toolset, build a second-brain/personal assistant. The headline "starting point" doc. |
-| `docs/skills.md` ⏳ | Authoring `SKILL.md`, discovery, progressive disclosure. Write when Skills land. |
+| `docs/skills.md` ✅ | Authoring `SKILL.md`, discovery, progressive disclosure, `/skills` & `/skill:<name>`. |
 | `docs/development.md` ✅ | Project layout, running tests (unit vs `-m integration`, `PI_LIVE_LLM`), the optional local-pi-py path dependency, conventions. |
 
 (Several of these overlap with README sections; the README stays a quick tour and links

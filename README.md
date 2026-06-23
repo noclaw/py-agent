@@ -11,8 +11,8 @@ toolset for your own).
 
 > **Status:** working end to end — the full tool set (read/write/edit/bash/grep/find/ls),
 > the agent loop, system prompt, interactive CLI/REPL, **permissions**, **hooks**, **slash
-> commands** with custom markdown commands, and **session** save/resume (all modeled on
-> Claude Code). Next: compaction, memory tools. See [`PLAN.md`](PLAN.md).
+> commands** with custom markdown commands, **skills**, and **session** save/resume (all
+> modeled on Claude Code). Next: compaction, memory tools. See [`PLAN.md`](PLAN.md).
 
 ## Architecture
 
@@ -80,6 +80,7 @@ In the REPL, lines starting with `/` are commands. Built-ins:
 | `/mode <mode>` | show or set the permission mode |
 | `/sessions` | list saved sessions for this directory |
 | `/resume <id>` | resume a saved session |
+| `/skills` | list available skills (see below) |
 | `/exit`, `/quit` | leave |
 
 **Custom commands** are markdown files (just like Claude Code's `.claude/commands/`):
@@ -97,6 +98,28 @@ Read $1 and review it for bugs and edge cases. Be concise.
 ```
 
 Then `/review src/agent/loop.py` runs that prompt as a turn.
+
+## Skills
+
+Skills teach the agent workflows/knowledge with plain markdown. Unlike slash commands
+(user-invoked), skills are **model-aware** through *progressive disclosure*: only each
+skill's name and description go into the system prompt, and the model reads the full
+`SKILL.md` (with the `read` tool) when a task matches.
+
+Create `.pya/skills/<name>/SKILL.md` (project) or `~/.pya/skills/<name>/SKILL.md` (user):
+
+```markdown
+---
+name: changelog
+description: Use when asked to update the changelog or summarize recent changes.
+---
+Read CHANGELOG.md, then add a new entry under "Unreleased" summarizing the latest
+commits (`git log`). Keep entries terse and grouped by Added/Changed/Fixed.
+```
+
+The skill directory can hold helper files/scripts the instructions reference. `/skills`
+lists them; `/skill:<name>` invokes one directly. Otherwise the model picks a skill up on
+its own when your request matches its description.
 
 ## Sessions
 

@@ -12,6 +12,7 @@ from __future__ import annotations
 import datetime
 from pathlib import Path
 
+from .skills import Skill, format_skills_for_prompt
 from .types import Tool
 
 __all__ = ["build_system_prompt", "load_project_context"]
@@ -65,6 +66,7 @@ def build_system_prompt(
     custom: str | None = None,
     append: str | None = None,
     project_context: str | None = None,
+    skills: list[Skill] | None = None,
     today: str | None = None,
 ) -> str:
     """Assemble the system prompt for a run.
@@ -75,6 +77,8 @@ def build_system_prompt(
         custom: Replace the base persona entirely (the rest is still appended).
         append: Extra text appended after the guidelines.
         project_context: Project notes; if ``None``, auto-loaded from AGENTS.md/CLAUDE.md.
+        skills: Available skills; only their name/description/path go in the prompt
+            (the model reads each ``SKILL.md`` on demand — progressive disclosure).
         today: ISO date override (for deterministic tests).
     """
     parts: list[str] = [custom or BASE_PERSONA]
@@ -88,6 +92,9 @@ def build_system_prompt(
     )
     if guidelines:
         parts.append("## Guidelines\n" + "\n".join(f"- {g}" for g in guidelines))
+
+    if skills:
+        parts.append(format_skills_for_prompt(skills))
 
     if project_context is None:
         project_context = load_project_context(cwd)

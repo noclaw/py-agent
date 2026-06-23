@@ -28,6 +28,7 @@ from .model import open_model
 from .permissions import PermissionMode, Permissions
 from .render import Renderer, _summarize_args
 from .sessions import Session, SessionStore
+from .skills import discover_skills
 from .system_prompt import build_system_prompt
 from .tools import coding_tools
 from .types import AgentMessage, user_message
@@ -136,7 +137,7 @@ async def _run_once(
 ) -> int:
     console = Console()
     tools = coding_tools(cwd)
-    system_prompt = build_system_prompt(tools, cwd)
+    system_prompt = build_system_prompt(tools, cwd, skills=discover_skills(cwd))
     history.append(user_message(prompt))
     renderer = Renderer(console)
     approver = _make_approver(console)
@@ -163,10 +164,11 @@ async def _run_repl(
 ) -> int:
     console = Console()
     tools = coding_tools(cwd)
-    system_prompt = build_system_prompt(tools, cwd)
+    skills = discover_skills(cwd)
+    system_prompt = build_system_prompt(tools, cwd, skills=skills)
     renderer = Renderer(console)
     approver = _make_approver(console)
-    registry = build_registry(cwd)
+    registry = build_registry(cwd, skills=skills)
 
     async with open_model(provider=provider, model=model, reasoning=reasoning) as m:
         ctx = CommandContext(
