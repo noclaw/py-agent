@@ -17,12 +17,15 @@ public API a simple ``async for`` while supporting parallel, streaming tools.
 from __future__ import annotations
 
 import asyncio
+import inspect
 from dataclasses import dataclass
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, Awaitable, Callable, Union
 
 from pydantic import ValidationError
 
+from .hooks import Hooks, PostToolUse, PreToolUse
 from .model import ModelLike
+from .permissions import Permissions
 from .types import (
     AgentEnd,
     AgentEvent,
@@ -45,6 +48,11 @@ from .types import (
 
 #: Safety cap so a misbehaving model can't loop forever.
 DEFAULT_MAX_TURNS = 50
+
+#: An approver decides an "ask" permission interactively. Given (tool_name, args, reason),
+#: it returns "once" (allow this call), "always" (allow + remember a rule), or "deny".
+#: May be sync or async.
+Approver = Callable[[str, dict[str, Any], Union[str, None]], Union[str, Awaitable[str]]]
 
 
 @dataclass
@@ -82,9 +90,18 @@ async def run_agent(
     history: list[AgentMessage],
     *,
     system_prompt: str | None = None,
+    hooks: Hooks | None = None,
+    permissions: Permissions | None = None,
+    approver: Approver | None = None,
     max_turns: int = DEFAULT_MAX_TURNS,
 ) -> AsyncIterator[AgentEvent]:
     """Run the agent to completion, yielding events. ``history`` is appended to in place.
+
+    Args:
+        hooks: optional :class:`~agent.hooks.Hooks` (PreToolUse/PostToolUse callbacks).
+        permissions: optional :class:`~agent.permissions.Permissions`; when ``None`` every
+            tool call runs (the library default — the app layer sets policy).
+        approver: called when permissions say "ask"; see :data:`Approver`.
 
     Drive it with::
 
@@ -97,7 +114,7 @@ async def run_agent(
 
     async def producer() -> None:
         try:
-            await _drive(model, tools, history, system_prompt, max_turns, queue)
+            await _drive(model, tools, history, system_prompt, max_turns, queue, hooks, permissions, approver)
         finally:
             queue.put_nowait(done)  # type: ignore[arg-type]
 
@@ -125,6 +142,9 @@ async def _drive(
     system_prompt: str | None,
     max_turns: int,
     queue: asyncio.Queue[AgentEvent],
+    hooks: Hooks | None,
+    permissions: Permissions | None,
+    approver: Approver | None,
 ) -> None:
     tools_by_name = {tool.name: tool for tool in tools}
     wire_tools = tools_to_wire(tools) if tools else None
@@ -169,7 +189,7 @@ async def _drive(
             queue.put_nowait(AgentEnd("completed"))
             return
 
-        results = await _execute_tool_calls(calls, tools_by_name, queue)
+        results = await _execute_tool_calls(calls, tools_by_name, queue, hooks, permissions, approver)
         history.extend(results)
         queue.put_nowait(TurnEnd(turn))
         # 3. Loop: the model sees the tool results on the next turn.
@@ -179,27 +199,87 @@ async def _execute_tool_calls(
     calls: list[_ToolCallRef],
     tools_by_name: dict[str, Tool],
     queue: asyncio.Queue[AgentEvent],
+    hooks: Hooks | None,
+    permissions: Permissions | None,
+    approver: Approver | None,
 ) -> list[ToolResultMessage]:
     """Run a batch of tool calls and return their result messages (in call order).
 
     Runs in parallel by default; falls back to sequential if any called tool declares
-    ``execution_mode == "sequential"``.
+    ``execution_mode == "sequential"``. Gating (hooks + permissions + approval) is
+    serialized by a lock so interactive approval prompts never interleave, while the
+    actual tool work still overlaps.
     """
     sequential = any(
         tools_by_name[c.name].execution_mode == "sequential"
         for c in calls
         if c.name in tools_by_name
     )
+    gate_lock = asyncio.Lock()
 
     async def run_one(call: _ToolCallRef) -> ToolResultMessage:
         queue.put_nowait(ToolStart(call.id, call.name, call.arguments))
-        result = await _run_single_tool(call, tools_by_name, queue)
+        async with gate_lock:
+            blocked = await _gate(call, hooks, permissions, approver)
+        result = blocked if blocked is not None else await _run_single_tool(call, tools_by_name, queue)
+        result = await _post_tool_use(call, result, hooks)
         queue.put_nowait(ToolEnd(call.id, call.name, result))
         return tool_result_message(call.id, call.name, result.content, is_error=result.is_error)
 
     if sequential:
         return [await run_one(call) for call in calls]
     return list(await asyncio.gather(*(run_one(call) for call in calls)))
+
+
+async def _gate(
+    call: _ToolCallRef,
+    hooks: Hooks | None,
+    permissions: Permissions | None,
+    approver: Approver | None,
+) -> ToolResult | None:
+    """Decide whether ``call`` may run. Returns a blocking :class:`ToolResult`, or ``None``
+    to allow. Order mirrors Claude Code: PreToolUse hooks, then the permission policy."""
+    if hooks is not None:
+        for result in await hooks.run(PreToolUse(call.name, call.arguments, call.id)):
+            if result.decision == "deny":
+                return ToolResult(content=f"Blocked by hook: {result.reason or 'denied'}", is_error=True)
+            if result.decision == "allow":
+                return None  # hook explicitly allowed → skip the permission check
+
+    if permissions is None:
+        return None
+
+    decision = permissions.decide(call.name, call.arguments)
+    if decision == "deny":
+        return ToolResult(content=f"Permission denied for {call.name}.", is_error=True)
+    if decision == "ask":
+        if approver is None:
+            return ToolResult(
+                content=f"{call.name} requires approval, but no approver is configured.",
+                is_error=True,
+            )
+        choice = approver(call.name, call.arguments, None)
+        if inspect.isawaitable(choice):
+            choice = await choice
+        if choice == "always":
+            permissions.allow_always(call.name, call.arguments)
+        elif choice != "once":
+            return ToolResult(content=f"Denied by user: {call.name}.", is_error=True)
+    return None
+
+
+async def _post_tool_use(call: _ToolCallRef, result: ToolResult, hooks: Hooks | None) -> ToolResult:
+    """Run PostToolUse hooks; fold any additional context into the result."""
+    if hooks is None:
+        return result
+    for hook_result in await hooks.run(PostToolUse(call.name, call.arguments, call.id, result)):
+        if hook_result.additional_context:
+            result = ToolResult(
+                content=result.content + "\n\n" + hook_result.additional_context,
+                details=result.details,
+                is_error=result.is_error,
+            )
+    return result
 
 
 async def _run_single_tool(

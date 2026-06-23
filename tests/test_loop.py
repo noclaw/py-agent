@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
+from agent.hooks import Hooks, HookResult
 from agent.loop import run_agent
+from agent.permissions import PermissionMode, Permissions
 from agent.types import (
     AgentEnd,
     AgentStart,
@@ -18,6 +20,8 @@ from agent.types import (
     user_message,
 )
 from fakes import FakeModel, LoopingToolModel, error_turn, text_turn, tool_turn
+
+_BYPASS = Permissions(mode=PermissionMode.BYPASS)
 
 
 class EchoArgs(BaseModel):
@@ -140,3 +144,91 @@ async def test_max_turns_cap():
     events = await _collect(model, [EchoTool()], history, max_turns=3)
     assert isinstance(events[-1], AgentEnd) and events[-1].reason == "error"
     assert model.calls == 3
+
+
+# --- gating: permissions + hooks ------------------------------------------
+
+
+def _one_echo_then_done():
+    return FakeModel([tool_turn([("c1", "echo", {"text": "hi"})]), text_turn("ok")])
+
+
+async def test_permission_deny_blocks_tool():
+    history = [user_message("x")]
+    events = await _collect(
+        _one_echo_then_done(), [EchoTool()], history, permissions=Permissions(deny=["echo"])
+    )
+    end = [e for e in events if isinstance(e, ToolEnd)][0]
+    assert end.result.is_error and "denied" in end.result.content.lower()
+
+
+async def test_permission_ask_requires_approver():
+    history = [user_message("x")]
+    # echo is not a read-only tool, so default mode → ask; no approver → blocked.
+    events = await _collect(_one_echo_then_done(), [EchoTool()], history, permissions=Permissions())
+    end = [e for e in events if isinstance(e, ToolEnd)][0]
+    assert end.result.is_error and "approval" in end.result.content.lower()
+
+
+async def test_permission_ask_approver_allows():
+    history = [user_message("x")]
+
+    async def approver(name, args, reason):
+        return "once"
+
+    events = await _collect(
+        _one_echo_then_done(), [EchoTool()], history, permissions=Permissions(), approver=approver
+    )
+    end = [e for e in events if isinstance(e, ToolEnd)][0]
+    assert not end.result.is_error and end.result.content == "hi"
+
+
+async def test_permission_always_remembers_for_later_calls():
+    history = [user_message("x")]
+    calls = []
+
+    async def approver(name, args, reason):
+        calls.append(name)
+        return "always"
+
+    model = FakeModel(
+        [
+            tool_turn([("c1", "echo", {"text": "a"})]),
+            tool_turn([("c2", "echo", {"text": "b"})]),
+            text_turn("ok"),
+        ]
+    )
+    await _collect(model, [EchoTool()], history, permissions=Permissions(), approver=approver)
+    assert calls == ["echo"]  # approver asked once; second call auto-allowed by the rule
+    results = [m for m in history if isinstance(m, ToolResultMessage)]
+    assert [r.content for r in results] == ["a", "b"]
+
+
+async def test_hook_deny_blocks_even_in_bypass():
+    history = [user_message("x")]
+    hooks = Hooks()
+
+    @hooks.pre_tool_use(matcher="echo")
+    def deny(event):
+        return HookResult(decision="deny", reason="nope")
+
+    events = await _collect(
+        _one_echo_then_done(), [EchoTool()], history, hooks=hooks, permissions=_BYPASS
+    )
+    end = [e for e in events if isinstance(e, ToolEnd)][0]
+    assert end.result.is_error and "hook" in end.result.content.lower()
+
+
+async def test_post_tool_use_appends_context():
+    history = [user_message("x")]
+    hooks = Hooks()
+
+    @hooks.post_tool_use()
+    def tag(event):
+        return HookResult(additional_context="[checked]")
+
+    events = await _collect(
+        _one_echo_then_done(), [EchoTool()], history, hooks=hooks, permissions=_BYPASS
+    )
+    end = [e for e in events if isinstance(e, ToolEnd)][0]
+    assert "[checked]" in end.result.content

@@ -44,6 +44,20 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Working directory the agent operates in (default: current directory).",
     )
     parser.add_argument(
+        "--permission-mode",
+        default="default",
+        choices=["default", "acceptEdits", "plan", "bypass"],
+        help=(
+            "How to gate mutating tools: default (ask), acceptEdits (auto-allow "
+            "write/edit), plan (deny mutations), bypass (allow everything)."
+        ),
+    )
+    parser.add_argument(
+        "--yolo",
+        action="store_true",
+        help="Skip all permission prompts (alias for --permission-mode bypass).",
+    )
+    parser.add_argument(
         "-p",
         "--print",
         dest="prompt",
@@ -93,12 +107,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     # Default: one-shot if -p was given, otherwise the interactive REPL.
     from .app import run
 
+    permission_mode = "bypass" if args.yolo else args.permission_mode
     return run(
         provider=args.provider,
         model=args.model,
         reasoning=args.reasoning,
         cwd=args.cwd,
         prompt=args.prompt,
+        permission_mode=permission_mode,
     )
 
 
