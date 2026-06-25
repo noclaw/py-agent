@@ -61,14 +61,14 @@ wheels = [
 
 [[package]]
 name = "pi-py-sdk"
-version = "0.2.0"
+version = "0.2.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/96/29/1de6a2f2b4dca9b59eb619a2d6dca094b58380314272268805d8adb92a62/pi_py_sdk-0.2.0.tar.gz", hash = "sha256:723fae8dc289b7093c727504489107a1d819e30e2aad55594575af5f8eec47d0", size = 49532, upload-time = "2026-06-23T21:44:13.096Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/29/0a/20a901e4b7121086b337264ea5e02aaa046ccbf8dd981b4018706cedde49/pi_py_sdk-0.2.1.tar.gz", hash = "sha256:2e0c7af6b13b3a6146f199f8804cca330eb97e9a9b61e658024126f19d9e4e17", size = 49873, upload-time = "2026-06-25T23:55:54.027Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/90/bb/074de513719cf9d853d7eab9eb0b13ff2ad2c499e89de047b04b90732182/pi_py_sdk-0.2.0-py3-none-any.whl", hash = "sha256:d6adff00fcfb3dc3d92bcf16ce7787985b66180b2deee728679614f55078d22c", size = 37949, upload-time = "2026-06-23T21:44:11.682Z" },
+    { url = "https://files.pythonhosted.org/packages/96/2f/af52f872f91a64168759e96fe9b9800ac3c0e666138ba7fa01d4ecd05f7a/pi_py_sdk-0.2.1-py3-none-any.whl", hash = "sha256:9ead46b83d0f0ce4ece7b26badf103a921844305c154b7b062d0b6d2855bdebc", size = 38301, upload-time = "2026-06-25T23:55:52.729Z" },
 ]
 
 [[package]]
