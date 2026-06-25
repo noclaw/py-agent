@@ -219,6 +219,23 @@ async def test_hook_deny_blocks_even_in_bypass():
     assert end.result.is_error and "hook" in end.result.content.lower()
 
 
+async def test_transform_context_replaces_history_before_streaming():
+    history = [user_message("a"), user_message("b"), user_message("c")]
+    seen: list[int] = []
+
+    async def transform(hist, emit):
+        seen.append(len(hist))
+        return [user_message("compacted")]  # swap in a shorter history
+
+    model = FakeModel([text_turn("ok")])
+    await _collect(model, [], history, transform_context=transform)
+
+    assert seen == [3]  # called once, before the (only) turn
+    # The model streamed the transformed history, and `history` was replaced in place.
+    assert model.calls[0]["messages"][0]["content"] == "compacted"
+    assert history[0].content == "compacted"
+
+
 async def test_post_tool_use_appends_context():
     history = [user_message("x")]
     hooks = Hooks()

@@ -51,6 +51,9 @@ __all__ = [
     "ToolEnd",
     "TurnEnd",
     "AgentEnd",
+    "AgentRetry",
+    "CompactionStart",
+    "CompactionEnd",
 ]
 
 
@@ -331,6 +334,31 @@ class AgentEnd(AgentEvent):
     """The run finished. ``reason`` is "completed", "error", or "aborted"."""
 
     reason: str = "completed"
+
+
+@dataclass(frozen=True)
+class AgentRetry(AgentEvent):
+    """A turn failed with a transient error and is being retried after ``delay`` seconds."""
+
+    attempt: int
+    max_retries: int
+    delay: float
+    error: str | None = None
+
+
+@dataclass(frozen=True)
+class CompactionStart(AgentEvent):
+    """The loop is about to summarize older history to free up context."""
+
+    before_messages: int
+
+
+@dataclass(frozen=True)
+class CompactionEnd(AgentEvent):
+    """History was compacted: ``before_messages`` → ``after_messages``."""
+
+    before_messages: int
+    after_messages: int
 
 
 #: Anything a loop event listener might receive. (Loops are async generators of these.)

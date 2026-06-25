@@ -20,6 +20,7 @@ from .find import FindTool
 from .grep import GrepTool
 from .ls import LsTool
 from .read import ReadTool
+from .task import TaskTool
 from .write import WriteTool
 
 __all__ = [
@@ -31,8 +32,10 @@ __all__ = [
     "GrepTool",
     "FindTool",
     "LsTool",
+    "TaskTool",
     "coding_tools",
     "read_only_tools",
+    "with_task_tool",
     "TOOL_CLASSES",
 ]
 
@@ -59,3 +62,29 @@ def coding_tools(cwd: str | Path = ".") -> list[Tool]:
 def read_only_tools(cwd: str | Path = ".") -> list[Tool]:
     """The non-mutating subset (read/grep/find/ls) — handy for analysis-only agents."""
     return [ReadTool(cwd), GrepTool(cwd), FindTool(cwd), LsTool(cwd)]
+
+
+def with_task_tool(
+    base: list[Tool],
+    *,
+    model,
+    cwd: str | Path = ".",
+    subagent_tools: list[Tool] | None = None,
+    permissions=None,
+    approver=None,
+) -> list[Tool]:
+    """Return ``base`` plus a :class:`TaskTool` that spawns sub-agents.
+
+    The sub-agent's toolset defaults to a fresh ``coding_tools(cwd)`` (without a nested task
+    tool, so delegation can't recurse). Pass ``permissions``/``approver`` to keep the
+    sub-agent's mutating calls gated the same way as the parent's.
+    """
+    child_tools = subagent_tools if subagent_tools is not None else coding_tools(cwd)
+    task = TaskTool(
+        model=model,
+        tools=child_tools,
+        cwd=str(cwd),
+        permissions=permissions,
+        approver=approver,
+    )
+    return [*base, task]

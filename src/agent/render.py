@@ -18,8 +18,11 @@ from rich.console import Console
 from .types import (
     AgentEnd,
     AgentEvent,
+    AgentRetry,
     AssistantDelta,
     AssistantDone,
+    CompactionEnd,
+    CompactionStart,
     ToolEnd,
     ToolStart,
 )
@@ -84,6 +87,22 @@ class Renderer:
                 self.console.print(f"  [red]✗ {_first_line(result.content)}[/red]")
             else:
                 self.console.print(f"  [green]✓[/green] [dim]{_first_line(result.content)}[/dim]")
+        elif isinstance(event, AgentRetry):
+            self._newline_if_needed()
+            reason = f" [dim]({_first_line(event.error)})[/dim]" if event.error else ""
+            self.console.print(
+                f"[yellow]⟳ transient error — retry {event.attempt}/{event.max_retries} "
+                f"in {event.delay:.0f}s[/yellow]{reason}"
+            )
+        elif isinstance(event, CompactionStart):
+            self._newline_if_needed()
+            self.console.print(
+                f"[dim]⊟ compacting context ({event.before_messages} messages)…[/dim]"
+            )
+        elif isinstance(event, CompactionEnd):
+            self.console.print(
+                f"[dim]⊟ compacted {event.before_messages} → {event.after_messages} messages[/dim]"
+            )
         elif isinstance(event, AgentEnd):
             self._on_end(event)
 

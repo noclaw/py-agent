@@ -37,7 +37,12 @@ asyncio.run(main())
 ```
 
 That's the whole embedding API. Add `permissions=`, `approver=`, `hooks=` to gate or
-observe tool use; the loop is permissive by default.
+observe tool use; the loop is permissive by default. Two more optional keywords harden longer
+runs: `retry=RetryPolicy(...)` re-streams a turn on transient model errors
+([auto-retry](agent-loop.md#auto-retry)), and `transform_context=Compactor(model, ...).transform`
+summarizes old history as it nears the context window ([compaction](agent-loop.md#compaction)).
+To let your agent delegate, wrap the toolset with
+[`with_task_tool`](tools.md#sub-agents-the-task-tool).
 
 ## Swap the toolset (a second-brain example)
 

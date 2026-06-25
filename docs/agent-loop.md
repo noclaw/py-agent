@@ -9,6 +9,7 @@ understand py-agent, read that one; this is the map.
 async def run_agent(
     model, tools, history, *,
     system_prompt=None, hooks=None, permissions=None, approver=None, max_turns=50,
+    retry=None, transform_context=None,
 ) -> AsyncIterator[AgentEvent]: ...
 ```
 
@@ -22,7 +23,9 @@ async for event in run_agent(model, tools, history, system_prompt=sp):
 
 The events (`agent.types`): `AgentStart`, `TurnStart`, `AssistantDelta` (wraps a raw
 `StreamEvent`), `AssistantDone`, `ToolStart`, `ToolOutput`, `ToolEnd`, `TurnEnd`,
-`AgentEnd(reason)` where reason is `"completed"`, `"error"`, or `"aborted"`.
+`AgentEnd(reason)` where reason is `"completed"`, `"error"`, or `"aborted"`. Two optional
+features add their own events: `AgentRetry` ([auto-retry](#auto-retry)) and
+`CompactionStart`/`CompactionEnd` ([compaction](#compaction)).
 
 ## Why a queue
 
@@ -39,11 +42,9 @@ propagates into running tools — e.g. `bash` kills its process group).
 emit AgentStart
 loop:
   turn += 1; if turn > max_turns: emit AgentEnd("error"); stop
+  if transform_context: history = transform_context(history, emit) or history   # e.g. compaction
   emit TurnStart
-  # stream the assistant
-  for event in model.stream(system_prompt, to_llm_messages(history), tools):
-      emit AssistantDelta(event)
-      if event.is_terminal: assistant = event.final_message
+  assistant = _stream_turn(...)       # stream the assistant, retrying transient errors
   append assistant to history; emit AssistantDone
   if assistant.stopReason in ("error","aborted"): emit AgentEnd(...); stop
   calls = tool calls in the assistant message
@@ -55,6 +56,27 @@ loop:
 History is converted to wire messages each turn via `to_llm_messages` (the `convertToLlm`
 seam). The terminal `done`/`error` event carries the final assistant message, so there's
 no delta accumulation to do.
+
+### Auto-retry
+
+`_stream_turn` streams one assistant turn and, if it ends in a transient model error
+(pi-ai's terminal `error` event), re-streams it per the `retry` policy
+([`RetryPolicy`](../src/agent/retry.py): exponential backoff, capped). A user `aborted` is
+never retried. Each retry emits an `AgentRetry(attempt, max_retries, delay, error)` event,
+then the loop sleeps the backoff and tries again; once retries are exhausted the error
+message is returned and the run ends `"error"`. With `retry=None` (the default for
+`run_agent`) a turn is streamed exactly once. The CLI sets it via `--max-retries` (default 2).
+
+### Compaction
+
+`transform_context(history, emit)` runs once per turn **before** streaming and may return a
+replacement history — the seam [compaction](../PLAN.md) plugs into. `agent.compaction.Compactor`
+estimates the token footprint (from the last assistant message's reported `usage`, with a
+char-count fallback) and, once it exceeds `threshold × context_window`, summarizes all but
+the most recent K messages into a single synthetic user message — emitting
+`CompactionStart`/`CompactionEnd`. The split point is nudged back so it never orphans a
+tool-result from its tool call. The CLI enables it by default (`--no-compact`,
+`--context-window`).
 
 ## `_execute_tool_calls` — gate then run
 
@@ -83,5 +105,6 @@ for each call (parallel by default):
 ## Extending the loop
 
 Everything is injected, so you rarely edit `loop.py`: pass your own `tools`, `hooks`,
-`permissions`, and `approver`. The one seam not yet wired is `transform_context` (for
-[compaction](../PLAN.md)); that's the natural place to add it.
+`permissions`, `approver`, `retry` policy, and `transform_context`. The last is the general
+context-rewrite seam — [compaction](#compaction) is its canonical use, but anything that
+rewrites history before a turn (redaction, pruning, re-ranking retrieved context) fits there.

@@ -76,6 +76,28 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Don't save this conversation to disk.",
     )
     parser.add_argument(
+        "--max-retries",
+        type=int,
+        default=2,
+        help="Retries for transient model errors per turn (0 disables; default: 2).",
+    )
+    parser.add_argument(
+        "--no-compact",
+        action="store_true",
+        help="Disable auto-compaction of old history as it nears the context window.",
+    )
+    parser.add_argument(
+        "--context-window",
+        type=int,
+        default=200_000,
+        help="Model context window in tokens, used to size compaction (default: 200000).",
+    )
+    parser.add_argument(
+        "--no-subagent",
+        action="store_true",
+        help="Don't expose the `task` tool (sub-agent delegation).",
+    )
+    parser.add_argument(
         "-p",
         "--print",
         dest="prompt",
@@ -136,6 +158,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         continue_session=args.continue_session,
         resume=args.resume,
         no_session=args.no_session,
+        max_retries=args.max_retries,
+        compact=not args.no_compact,
+        context_window=args.context_window,
+        subagent=not args.no_subagent,
     )
 
 

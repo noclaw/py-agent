@@ -58,6 +58,47 @@ outright. If no hook has an opinion, the [permission policy](permissions.md) dec
 (allow / deny / ask). This lets a hook implement bespoke rules (e.g. block writes outside a
 directory) while the permission system handles the general allow/deny/ask flow.
 
-> The REPL does not register `UserPromptSubmit` hooks by default — wiring that in `app.py`
-> is a small, documented follow-up (see `PLAN.md`). `PreToolUse`/`PostToolUse` are fully
-> wired through the loop.
+## `UserPromptSubmit` in the REPL
+
+`UserPromptSubmit` is wired in `app.py` (REPL and one-shot): every submitted prompt — typed
+text, or a markdown/skill command after expansion — runs through the registered hooks before
+the turn starts (`_apply_prompt_submit`). A hook may:
+
+- **block** the prompt (`decision="deny"`): the turn is skipped and the reason is printed;
+- **augment** it (`additional_context`): the text is appended to the message the model sees.
+
+All `additional_context` from the hooks is collected and appended; the original prompt is
+never mutated in place.
+
+### The default hook
+
+When you don't pass your own hooks, `app.py` installs a small **demonstrative** default set
+(`_build_default_hooks`) with one `UserPromptSubmit` hook that tags each prompt with the
+current git branch:
+
+```python
+@hooks.user_prompt_submit()
+def add_git_branch(event):
+    branch = _git_branch(cwd)        # `git rev-parse --abbrev-ref HEAD`, or None
+    return HookResult(additional_context=f"(current git branch: {branch})") if branch else None
+```
+
+So a prompt like `fix the failing test` reaches the model as:
+
+```
+fix the failing test
+
+(current git branch: feature/retry)
+```
+
+It exists to show the seam in action — swap it for your own (secrets redaction, repo state,
+a `deny` rule, …). To run **without** any hooks, pass an empty set:
+
+```python
+from agent.app import run
+from agent.hooks import Hooks
+run(provider="anthropic", model="claude-sonnet-4-6", hooks=Hooks())   # no default git-branch hook
+```
+
+`PreToolUse`/`PostToolUse` hooks you register are passed through to `run_agent` as well, so
+the same `Hooks` object gates tools and prompts.

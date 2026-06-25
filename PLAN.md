@@ -7,7 +7,8 @@ that is (a) easy to read for people learning Python, and (b) a clean starting po
 personal-assistant / second-brain agents.
 
 The shipped feature set deliberately mirrors **Claude Code** (tools, hooks, slash + markdown
-commands, permissions, sessions, and — planned — skills) so the concepts transfer.
+commands, permissions, sessions, skills, compaction, auto-retry, and sub-agents) so the
+concepts transfer.
 
 ---
 
@@ -63,7 +64,9 @@ client) left untouched.
 | 6. System prompt (programmatic, + project context) | ✅ | `system_prompt.py` |
 | 7. CLI / REPL / renderer (one-shot + multi-turn, Ctrl-C abort) | ✅ | `cli.py`, `app.py`, `render.py` |
 
-**Optional features already done** (Claude-Code-shaped):
+### Additional features (Claude-Code-shaped) ✅
+
+Beyond the seven core phases, these optional features are also built:
 
 - ✅ **Permissions** — modes (default/acceptEdits/plan/bypass), allow/deny rules
   (`bash(git *)`, `write(src/*)`), interactive y/a/n approval. `permissions.py`.
@@ -77,119 +80,84 @@ client) left untouched.
 - ✅ **Skills** — progressive-disclosure `SKILL.md` under `.pya/skills/<name>/`; name +
   description injected into the system prompt, full file read on demand; `/skills` and
   `/skill:<name>`. `skills.py`.
+- ✅ **Compaction** — auto-summarize old history near the context window via a
+  `transform_context` seam on the loop. `compaction.py`.
+- ✅ **Auto-retry** — re-stream a turn on transient model errors with backoff. `retry.py`.
+- ✅ **Sub-agents** — a `task` tool spawning a child `run_agent` with its own budget.
+  `tools/task.py`.
+- ✅ **`UserPromptSubmit` wiring** — hooks can block/augment a prompt before each turn. `app.py`.
 
-**Tests:** ~90 unit (driven by a scripted fake-model fixture, no network) + a few gated
+**Tests:** ~115 unit (driven by a scripted fake-model fixture, no network) + a few gated
 live integration tests (`PI_LIVE_LLM=1`).
 
 ---
 
-## Remaining / optional phases (by recommended priority)
+## Potential Features (by recommended priority)
 
-### Skills ✅ *(done — `skills.py`)*
+Ideas for anyone extending this codebase into their own agent. None are required for the
+example to be complete; they're the natural next seams. Roughly ordered by value for the
+project's two goals — (a) readable learning example, (b) base for assistant / second-brain
+agents.
 
-Implemented as designed below. Skills let you teach the agent workflows and knowledge with
-**plain markdown**, no servers or protocol — they differ from slash commands
-(user-invoked): skills are *model-aware* via **progressive disclosure** — only each skill's
-name + description sits in the system prompt, and the model reads the full `SKILL.md` (with
-the `read` tool) when a task matches.
+### 1. Memory / second-brain tools
 
-Design (`skills.py`):
-- **Discovery:** `~/.pya/skills/<name>/SKILL.md` (user) and `<cwd>/.pya/skills/<name>/SKILL.md`
-  (project). Frontmatter `name`, `description`; the body is instructions and may reference
-  sibling files/scripts in the skill directory.
-- **Prompt integration:** extend `build_system_prompt(..., skills=...)` to emit an
-  `<available_skills>` block of `{name, description, path}` (mirrors Pi's
-  `formatSkillsForSystemPrompt`). The model reads the path on demand.
-- **Optional UX:** a `/skills` command to list them, and `/skill:<name>` to invoke one
-  directly (like Pi's `enableSkillCommands`).
-- **Tests:** loader (frontmatter parse, discovery, precedence project>user), prompt block
-  assembly; live: a skill whose description triggers the model to read it and follow it.
-- Port reference: `packages/agent/src/harness/skills.ts`,
-  `packages/coding-agent/.../skills.ts`.
+The repurposing showcase: `note`, `recall`, `search_memory` over a local store (markdown
+files or sqlite). Demonstrates swapping the coding toolset for an assistant toolset via the
+same registry — directly serves goal (b). Good companion to
+[`docs/building-your-own-agent.md`](docs/building-your-own-agent.md).
 
-### 2. Compaction
+### 2. Settings file + model registry
 
-Auto-summarize when the conversation nears the model's context window. Implement as a
-`transform_context` hook on the loop (add that seam to `run_agent`), so it's optional and
-swappable. A simple "summarize the oldest turns, keep the most recent K tokens" is enough
-to demonstrate; Pi's branch summarization is advanced. Pairs naturally with sessions
-(persist a `compaction` entry). Port: `packages/agent/src/harness/compaction/`.
+A real config layer to replace the defaults-and-flags in `config.py`: load/merge a
+`.pya/settings.toml` (project) over `~/.pya/settings.toml` (user) for default model,
+permission mode, retry/compaction tuning, and a `models.json` for custom/local model ids
+(base URL, context window, pricing). Lets `--context-window` and friends be inferred per
+model instead of hard-coded. Port: `packages/coding-agent/src/config.ts`,
+`core/model-registry.ts`.
 
-### 3. Memory / second-brain tools
-
-The repurposing showcase: `note`, `recall`, `search_memory` over a local store
-(markdown files or sqlite). Demonstrates swapping the coding toolset for an assistant
-toolset via the same registry — directly serves goal (b). Good companion to a
-`docs/building-your-own-agent.md`.
-
-### 4. `UserPromptSubmit` hook wired into the REPL  *(small)*
-
-The loop already supports `UserPromptSubmit`; wire it in `app.py` so a hook can block a
-prompt or inject context before a turn (e.g. add the current git branch, redact secrets).
-
-### 5. Images / vision
+### 3. Images / vision
 
 Read-tool image attachments + passing `ImageContent` through to the model (pi-ai already
 supports it). Mostly plumbing.
 
-### 6. Sub-agents / Task tool
+### 4. Web tools (`web_fetch` / `web_search`)
 
-A `Task` tool that spawns a child `run_agent` with a restricted toolset and its own
-budget, returning a summary. Enables "scout → plan → implement" style delegation.
+Fetch a URL (to markdown) and run a search query, as ordinary `Tool` subclasses. Central to
+assistant/second-brain use cases and an easy, self-contained read for the tools chapter.
 
-### 7. Auto-retry
+### 5. Todo / planning tool
 
-Wrap a turn in a retry policy for transient model errors (pi-ai surfaces these as a
-terminal `error` event, so it's a clean wrapper). Pi has `retry.enabled/maxRetries`.
+A `todo` tool (Claude Code's `TodoWrite` shape) the agent uses to track a multi-step plan,
+rendered as a checklist. Improves long-task behavior and demonstrates a tool that mutates
+*shared run state* rather than the filesystem.
 
-### 8. MCP tool servers  *(lower priority than Skills)*
+### 6. Token / cost budget
+
+Enforce a per-run ceiling on tokens (or estimated cost) using the `usage` the renderer
+already accumulates: warn near the limit, stop cleanly when exceeded. Pairs with compaction
+(`--context-window`) and gives long autonomous runs a guardrail.
+
+### 7. MCP tool servers
 
 Expose external [MCP](https://modelcontextprotocol.io) tools through the same `Tool`
 protocol (an adapter that lists remote tools and proxies `execute`). Powerful but heavier
-than skills, and less central to the learning/second-brain goals — hence after Skills.
+than skills, and less central to the learning/second-brain goals.
 
-### 9. Polish
+### 8. Edit checkpoints / undo
 
-Richer TUI (`textual`/`prompt_toolkit`), HTML/markdown transcript export, themes.
+Snapshot file state before each `write`/`edit` (a shadow copy or a scratch git stash) so a
+session can rewind, à la Claude Code's checkpoint/rewind. Pairs with sessions and makes
+`--yolo` runs safer to experiment with.
 
----
+### 9. Persistent permission rules
 
-## Documentation — proposed `docs/` folder
+Save the allow/deny rules built up via the "always" approval to `.pya/` so they carry across
+sessions, instead of living only in memory for the current run (`permissions.py`).
 
-The repo *is* the example, so docs should explain the design and the extension seams (how
-to add tools/hooks/commands/skills and how to repurpose the agent), not restate the code.
-Suggested files (✅ = ready to write now; ⏳ = after the feature lands):
+### 10. Polish
 
-| File | What it documents |
-|---|---|
-| `docs/README.md` ✅ | Index/table of contents for the docs. |
-| `docs/architecture.md` ✅ | The pi-ai / pi-agent-core / pi-coding-agent split, the Node shim, the layering diagram, and the turn lifecycle (stream → tool calls → gate → execute → feed back). The "why" behind delegating only the model call. |
-| `docs/getting-started.md` ✅ | Install, Node + `pi` requirement, credentials (provider env var **or** `pi` OAuth login), first run, one-shot vs REPL. |
-| `docs/tools.md` ✅ | The built-in tools, and **how to write a custom tool**: Pydantic params → JSON Schema, `execute`, `ToolResult`, streaming via `on_update`, `execution_mode`, registering via a bundle. The key extension seam. |
-| `docs/permissions.md` ✅ | Modes, rule syntax (`tool`, `tool(glob)`), the approval flow, `allow_always`, and programmatic use of `Permissions`. |
-| `docs/hooks.md` ✅ | Events, decisions, matchers; worked examples (block dangerous bash, post-tool lint feedback, prompt-context injection). |
-| `docs/commands.md` ✅ | Built-in slash commands + authoring custom markdown commands (frontmatter, `$ARGUMENTS`/`$1`, namespacing). |
-| `docs/sessions.md` ✅ | The JSONL format, storage location (`PYA_SESSIONS_DIR`), per-cwd resume, and the linear-log-vs-Pi-tree tradeoff. |
-| `docs/models-and-providers.md` ✅ | How the model layer works via pi-py/pi-ai, the credential-resolution order, switching models (`/model`), and configuring custom/local models (Ollama, LM Studio) via `models.json`. |
-| `docs/configuration.md` ✅ | All env vars (`PYA_SESSIONS_DIR`, `PI_AI_DIR`, `PI_NODE`, provider keys), defaults, and `.pya/` directory layout (commands, skills). |
-| `docs/agent-loop.md` ✅ | A guided read of `loop.py` for learners/contributors: the event queue, turns, gating, parallel/sequential execution, cancellation. |
-| `docs/building-your-own-agent.md` ✅ | The repurposing guide: drive `run_agent` programmatically, swap the toolset, build a second-brain/personal assistant. The headline "starting point" doc. |
-| `docs/skills.md` ✅ | Authoring `SKILL.md`, discovery, progressive disclosure, `/skills` & `/skill:<name>`. |
-| `docs/development.md` ✅ | Project layout, running tests (unit vs `-m integration`, `PI_LIVE_LLM`), the optional local-pi-py path dependency, conventions. |
-
-(Several of these overlap with README sections; the README stays a quick tour and links
-into `docs/` for depth.)
-
-## `examples/` folder
-
-**Recommendation: drop it.** The whole repo is the worked example, the README has runnable
-commands, and the extension docs above carry focused snippets (custom tool, hook, command,
-skill, programmatic `run_agent`). A separate `examples/` of scripts would duplicate those
-and drift. The empty `examples/` directory has been removed. If we later want runnable
-end-to-end demos, prefer a single `docs/building-your-own-agent.md` with copy-pasteable
-code over a scripts folder.
-
----
+Richer TUI (`textual`/`prompt_toolkit`), HTML/markdown transcript export, themes, and
+persisting a `compaction` entry into the session JSONL so resumed runs keep the summary.
 
 ## Testing strategy
 

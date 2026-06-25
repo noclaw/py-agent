@@ -8,6 +8,7 @@ py-agent favors flags and a small `.pya/` directory over a config file.
 pya [--model MODEL] [--provider PROVIDER] [--reasoning LEVEL] [--cwd DIR]
     [--permission-mode {default,acceptEdits,plan,bypass}] [--yolo]
     [-c/--continue] [--resume SESSION_ID] [--no-session]
+    [--max-retries N] [--no-compact] [--context-window N] [--no-subagent]
     [-p/--print PROMPT]
 pya models [--provider PROVIDER]
 ```
@@ -17,7 +18,16 @@ pya models [--provider PROVIDER]
 - `--cwd` — directory the agent operates in (tools, project context, skills/commands).
 - `--permission-mode` / `--yolo` — tool gating ([permissions](permissions.md)).
 - `-c` / `--resume` / `--no-session` — [sessions](sessions.md).
+- `--max-retries` — retries for transient model errors per turn (default 2; `0` disables
+  [auto-retry](agent-loop.md#auto-retry)).
+- `--no-compact` / `--context-window` — disable, or size, [compaction](agent-loop.md#compaction)
+  of old history (default on, window 200000 tokens).
+- `--no-subagent` — don't expose the [`task` tool](tools.md#sub-agents-the-task-tool)
+  (sub-agent delegation); it's on by default.
 - `-p` — run one prompt and exit (otherwise a REPL).
+
+The REPL also installs a default [`UserPromptSubmit` hook](hooks.md#the-default-hook) that
+tags each prompt with the current git branch.
 
 ## Environment variables
 

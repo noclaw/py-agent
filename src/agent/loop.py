@@ -26,10 +26,12 @@ from pydantic import ValidationError
 from .hooks import Hooks, PostToolUse, PreToolUse
 from .model import ModelLike
 from .permissions import Permissions
+from .retry import RetryPolicy
 from .types import (
     AgentEnd,
     AgentEvent,
     AgentMessage,
+    AgentRetry,
     AgentStart,
     AssistantDelta,
     AssistantDone,
@@ -53,6 +55,14 @@ DEFAULT_MAX_TURNS = 50
 #: it returns "once" (allow this call), "always" (allow + remember a rule), or "deny".
 #: May be sync or async.
 Approver = Callable[[str, dict[str, Any], Union[str, None]], Union[str, Awaitable[str]]]
+
+#: Called before each turn's stream with the current history and an event-emit channel; may
+#: return a replacement history (e.g. compacted) or ``None`` to leave it unchanged. This is
+#: the seam :class:`agent.compaction.Compactor` plugs into.
+ContextTransform = Callable[
+    [list[AgentMessage], Callable[[AgentEvent], None]],
+    Awaitable[Union[list[AgentMessage], None]],
+]
 
 
 @dataclass
@@ -94,6 +104,8 @@ async def run_agent(
     permissions: Permissions | None = None,
     approver: Approver | None = None,
     max_turns: int = DEFAULT_MAX_TURNS,
+    retry: RetryPolicy | None = None,
+    transform_context: ContextTransform | None = None,
 ) -> AsyncIterator[AgentEvent]:
     """Run the agent to completion, yielding events. ``history`` is appended to in place.
 
@@ -102,6 +114,10 @@ async def run_agent(
         permissions: optional :class:`~agent.permissions.Permissions`; when ``None`` every
             tool call runs (the library default — the app layer sets policy).
         approver: called when permissions say "ask"; see :data:`Approver`.
+        retry: optional :class:`~agent.retry.RetryPolicy`; re-streams a turn that ends in a
+            transient model error (never a user ``aborted``).
+        transform_context: optional :data:`ContextTransform` run before each turn — the seam
+            compaction plugs into.
 
     Drive it with::
 
@@ -114,7 +130,10 @@ async def run_agent(
 
     async def producer() -> None:
         try:
-            await _drive(model, tools, history, system_prompt, max_turns, queue, hooks, permissions, approver)
+            await _drive(
+                model, tools, history, system_prompt, max_turns, queue,
+                hooks, permissions, approver, retry, transform_context,
+            )
         finally:
             queue.put_nowait(done)  # type: ignore[arg-type]
 
@@ -145,6 +164,8 @@ async def _drive(
     hooks: Hooks | None,
     permissions: Permissions | None,
     approver: Approver | None,
+    retry: RetryPolicy | None,
+    transform_context: ContextTransform | None,
 ) -> None:
     tools_by_name = {tool.name: tool for tool in tools}
     wire_tools = tools_to_wire(tools) if tools else None
@@ -156,18 +177,19 @@ async def _drive(
         if turn > max_turns:
             queue.put_nowait(AgentEnd("error"))
             return
+
+        # 0. Optionally rewrite the context (e.g. compaction) before streaming.
+        if transform_context is not None:
+            transformed = await transform_context(history, queue.put_nowait)
+            if transformed is not None:
+                history[:] = transformed
+
         queue.put_nowait(TurnStart(turn))
 
-        # 1. Stream the assistant response for this turn.
-        assistant = None
-        async for event in model.stream(
-            system_prompt=system_prompt,
-            messages=to_llm_messages(history),
-            tools=wire_tools,
-        ):
-            queue.put_nowait(AssistantDelta(event))
-            if event.is_terminal:
-                assistant = event.final_message
+        # 1. Stream the assistant response for this turn (retrying transient errors).
+        assistant = await _stream_turn(
+            model, system_prompt, history, wire_tools, queue, retry
+        )
 
         if assistant is None:
             queue.put_nowait(AgentEnd("error"))
@@ -193,6 +215,43 @@ async def _drive(
         history.extend(results)
         queue.put_nowait(TurnEnd(turn))
         # 3. Loop: the model sees the tool results on the next turn.
+
+
+async def _stream_turn(
+    model: ModelLike,
+    system_prompt: str | None,
+    history: list[AgentMessage],
+    wire_tools: list[dict[str, Any]] | None,
+    queue: asyncio.Queue[AgentEvent],
+    retry: RetryPolicy | None,
+) -> Any | None:
+    """Stream one assistant turn, retrying transient errors per ``retry``.
+
+    Returns the final assistant message, or ``None`` if the stream produced no terminal
+    event even after retries. A user ``aborted`` is returned as-is (never retried).
+    """
+    max_retries = retry.max_retries if retry is not None else 0
+    attempt = 0
+    while True:
+        assistant = None
+        async for event in model.stream(
+            system_prompt=system_prompt,
+            messages=to_llm_messages(history),
+            tools=wire_tools,
+        ):
+            queue.put_nowait(AssistantDelta(event))
+            if event.is_terminal:
+                assistant = event.final_message
+
+        stop = getattr(assistant, "stopReason", None) if assistant is not None else "error"
+        if stop != "error" or attempt >= max_retries:
+            return assistant
+
+        attempt += 1
+        delay = retry.delay_for(attempt)  # type: ignore[union-attr]  (retry set when max_retries>0)
+        error_text = getattr(assistant, "errorMessage", None) if assistant is not None else None
+        queue.put_nowait(AgentRetry(attempt, max_retries, delay, error_text))
+        await asyncio.sleep(delay)
 
 
 async def _execute_tool_calls(

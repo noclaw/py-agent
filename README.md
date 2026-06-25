@@ -11,8 +11,9 @@ toolset for your own).
 
 > **Status:** working end to end — the full tool set (read/write/edit/bash/grep/find/ls),
 > the agent loop, system prompt, interactive CLI/REPL, **permissions**, **hooks**, **slash
-> commands** with custom markdown commands, **skills**, and **session** save/resume (all
-> modeled on Claude Code). Next: compaction, memory tools. See [`PLAN.md`](PLAN.md).
+> commands** with custom markdown commands, **skills**, **session** save/resume,
+> **compaction**, **auto-retry**, and **sub-agents** (a `task` tool) — all modeled on Claude
+> Code. Next: memory / second-brain tools. See [`PLAN.md`](PLAN.md).
 
 ## Architecture
 
@@ -176,7 +177,31 @@ def block_force_push(event):
 ```
 
 A `PreToolUse` hook can `allow` (skip the permission check) or `deny` (block) a call;
-`PostToolUse` can attach `additional_context` fed back to the model.
+`PostToolUse` can attach `additional_context` fed back to the model. In the REPL a default
+`UserPromptSubmit` hook tags each prompt with the current git branch — pass your own
+`Hooks()` to replace it.
+
+## Sub-agents
+
+The agent can delegate a self-contained sub-task to a child agent with its own tools and
+turn budget via the `task` tool. The child runs autonomously and returns a single report,
+so the parent's context stays clean of the child's intermediate steps — handy for
+"scout → plan → implement" style work. It's on by default; disable with `--no-subagent`.
+See [tools › sub-agents](docs/tools.md#sub-agents-the-task-tool).
+
+## Compaction & auto-retry
+
+Two reliability features keep longer runs healthy, both on by default:
+
+```bash
+uv run pya --no-compact            # disable auto-summarizing old history
+uv run pya --context-window 400000 # size compaction to the model's window (default 200000)
+uv run pya --max-retries 0         # disable retrying transient model errors (default 2)
+```
+
+**Compaction** summarizes the oldest turns once the conversation nears the context window;
+**auto-retry** re-streams a turn that ends in a transient model error (exponential backoff).
+Both are seams on the loop — see [the agent loop](docs/agent-loop.md#auto-retry).
 
 ## Documentation
 
@@ -192,3 +217,7 @@ Deeper guides live in [`docs/`](docs/README.md): [architecture](docs/architectur
 uv run pytest                 # unit tests (no Node)
 uv run pytest -m integration  # live tests (need Node + pi-ai)
 ```
+
+## License
+
+[MIT](LICENSE).

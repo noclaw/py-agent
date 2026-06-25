@@ -20,16 +20,24 @@ the whole point of writing it here.
 ```
 src/agent/
   cli.py            # `pya` entry point                 (← coding-agent/src/cli)
-  app.py            # REPL + one-shot runner
+  app.py            # REPL + one-shot runner; policy wiring (perms/hooks/retry/compaction)
   loop.py           # the agent loop                       (← agent/src/agent-loop.ts)
   types.py          # AgentMessage, events, Tool protocol  (← agent/src/types.ts)
   model.py          # adapter over pi_py_sdk.PiModelClient + model registry
   system_prompt.py  # build_system_prompt                  (← coding-agent/.../system-prompt.ts)
   config.py         # settings + defaults                  (← coding-agent/src/config.ts)
   render.py         # event -> terminal rendering
-  tools/            # read/write/edit/bash/grep/find/ls    (← coding-agent/.../tools/)
+  permissions.py    # tool gating: modes + allow/deny rules + approval
+  hooks.py          # PreToolUse / PostToolUse / UserPromptSubmit callbacks
+  commands.py       # slash commands + custom markdown commands
+  sessions.py       # JSONL save/resume
+  skills.py         # progressive-disclosure SKILL.md discovery + prompt block
+  compaction.py     # context compaction (transform_context seam)
+  retry.py          # RetryPolicy for transient model errors
+  tools/            # read/write/edit/bash/grep/find/ls + task (sub-agent)
 tests/              # pytest; unit tests need no Node (fake model)
-PLAN.md             # phased roadmap + Pi module map
+docs/               # design + usage guides (start at docs/README.md)
+PLAN.md             # status + Potential Features roadmap + Pi module map
 ```
 
 ## Dependency on pi-py
@@ -58,10 +66,13 @@ The key fixture is a **fake model** (scripted `StreamEvent` sequences) so the lo
 tools are tested without the network. Live model calls go behind the `integration` marker
 and are skipped unless `PI_LIVE_LLM=1`.
 
-## Phasing
+## Status
 
-Work proceeds in the phases in `PLAN.md` (currently: Phase 1 scaffold done; next is types
--> tools + loop -> prompt -> CLI/REPL). Keep changes scoped to the active phase.
+All seven core phases and the Claude-Code-shaped extras (permissions, hooks, commands,
+sessions, skills, compaction, auto-retry, sub-agents) are built — see `PLAN.md` for the full
+status and the **Potential Features** list (memory tools, settings/model registry, images,
+web tools, MCP, …) for anything new. Keep changes scoped and the loop/tools readable; put
+policy in the app layer, not the loop.
 
 ## Git
 

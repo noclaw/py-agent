@@ -17,21 +17,102 @@ from __future__ import annotations
 
 import asyncio
 import signal
+import subprocess
+from dataclasses import dataclass
 
 from rich.console import Console
 
 from pi_py_sdk import PiError
 
 from .commands import CommandContext, build_registry
-from .loop import run_agent
+from .compaction import CompactionConfig, Compactor
+from .hooks import HookResult, Hooks, UserPromptSubmit
+from .loop import ContextTransform, run_agent
 from .model import open_model
 from .permissions import PermissionMode, Permissions
 from .render import Renderer, _summarize_args
+from .retry import RetryPolicy
 from .sessions import Session, SessionStore
 from .skills import discover_skills
 from .system_prompt import build_system_prompt
-from .tools import coding_tools
+from .tools import coding_tools, with_task_tool
 from .types import AgentMessage, user_message
+
+
+@dataclass
+class _RunSettings:
+    """The optional-feature toggles assembled by :func:`run` and threaded into a session."""
+
+    hooks: Hooks | None
+    retry: RetryPolicy | None
+    compact: bool
+    context_window: int
+    subagent: bool
+
+
+def _build_tools(model, cwd, permissions, approver, settings: _RunSettings):
+    """The per-session tool list. The ``task`` sub-agent calls ``model``, so build it here
+    (after :func:`open_model`)."""
+    tools = coding_tools(cwd)
+    if settings.subagent:
+        tools = with_task_tool(
+            tools, model=model, cwd=cwd, permissions=permissions, approver=approver
+        )
+    return tools
+
+
+def _make_transform(model, settings: _RunSettings) -> ContextTransform | None:
+    """The optional compaction ``transform_context`` callback (``None`` when disabled)."""
+    if not settings.compact:
+        return None
+    compactor = Compactor(model, CompactionConfig(max_tokens=settings.context_window))
+    return compactor.transform
+
+
+def _git_branch(cwd: str) -> str | None:
+    """Current git branch of ``cwd`` (or ``None`` if not a repo / git is unavailable)."""
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=cwd, capture_output=True, text=True, timeout=2,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    branch = out.stdout.strip()
+    return branch or None
+
+
+def _build_default_hooks(cwd: str) -> Hooks:
+    """A small demonstrative hook set: tag each prompt with the current git branch.
+
+    This is the ``UserPromptSubmit`` seam in action — a hook may instead ``deny`` a prompt
+    or inject other context (secrets redaction, repo state, etc.).
+    """
+    hooks = Hooks()
+
+    @hooks.user_prompt_submit()
+    def add_git_branch(event: UserPromptSubmit) -> HookResult | None:
+        branch = _git_branch(cwd)
+        return HookResult(additional_context=f"(current git branch: {branch})") if branch else None
+
+    return hooks
+
+
+async def _apply_prompt_submit(hooks: Hooks | None, prompt: str, console: Console) -> str | None:
+    """Run ``UserPromptSubmit`` hooks. Returns the (possibly augmented) prompt, or ``None``
+    if a hook blocked it."""
+    if hooks is None:
+        return prompt
+    contexts: list[str] = []
+    for result in await hooks.run(UserPromptSubmit(prompt)):
+        if result.decision == "deny":
+            console.print(f"[red]prompt blocked by hook:[/red] {result.reason or 'denied'}")
+            return None
+        if result.additional_context:
+            contexts.append(result.additional_context)
+    if contexts:
+        prompt = prompt + "\n\n" + "\n".join(contexts)
+    return prompt
 
 
 def _make_approver(console: Console):
@@ -96,25 +177,45 @@ def run(
     continue_session: bool = False,
     resume: str | None = None,
     no_session: bool = False,
+    hooks: Hooks | None = None,
+    max_retries: int = 2,
+    compact: bool = True,
+    context_window: int = 200_000,
+    subagent: bool = True,
 ) -> int:
-    """Entry point used by the CLI. Runs one-shot if ``prompt`` is given, else the REPL."""
+    """Entry point used by the CLI. Runs one-shot if ``prompt`` is given, else the REPL.
+
+    Args:
+        hooks: optional hook set; defaults to a small demo set tagging prompts with the
+            git branch (see :func:`_build_default_hooks`). Pass ``Hooks()`` to disable.
+        max_retries: transient-error retries per turn (0 disables auto-retry).
+        compact: auto-summarize old history as it nears ``context_window``.
+        context_window: the model's context window, used to size compaction.
+        subagent: expose a ``task`` tool that can spawn sub-agents.
+    """
     permissions = Permissions(mode=PermissionMode(permission_mode))
     store = None if no_session else SessionStore()
     session, history, provider, model = _resolve_session(
         store, cwd, provider, model, continue_session=continue_session, resume=resume
+    )
+    if hooks is None:
+        hooks = _build_default_hooks(cwd)
+    retry = RetryPolicy(max_retries=max_retries) if max_retries > 0 else None
+    settings = _RunSettings(
+        hooks=hooks, retry=retry, compact=compact, context_window=context_window, subagent=subagent
     )
     try:
         if prompt is not None:
             return asyncio.run(
                 _run_once(
                     prompt, provider=provider, model=model, reasoning=reasoning, cwd=cwd,
-                    permissions=permissions, session=session, history=history,
+                    permissions=permissions, session=session, history=history, settings=settings,
                 )
             )
         return asyncio.run(
             _run_repl(
                 provider=provider, model=model, reasoning=reasoning, cwd=cwd, store=store,
-                permissions=permissions, session=session, history=history,
+                permissions=permissions, session=session, history=history, settings=settings,
             )
         )
     except KeyboardInterrupt:
@@ -134,16 +235,23 @@ async def _run_once(
     permissions: Permissions,
     session: Session | None,
     history: list[AgentMessage],
+    settings: _RunSettings,
 ) -> int:
     console = Console()
-    tools = coding_tools(cwd)
-    system_prompt = build_system_prompt(tools, cwd, skills=discover_skills(cwd))
-    history.append(user_message(prompt))
     renderer = Renderer(console)
     approver = _make_approver(console)
     async with open_model(provider=provider, model=model, reasoning=reasoning) as m:
+        tools = _build_tools(m, cwd, permissions, approver, settings)
+        transform = _make_transform(m, settings)
+        system_prompt = build_system_prompt(tools, cwd, skills=discover_skills(cwd))
+        submitted = await _apply_prompt_submit(settings.hooks, prompt, console)
+        if submitted is None:
+            return 1
+        history.append(user_message(submitted))
         async for event in run_agent(
-            m, tools, history, system_prompt=system_prompt, permissions=permissions, approver=approver
+            m, tools, history, system_prompt=system_prompt, hooks=settings.hooks,
+            permissions=permissions, approver=approver, retry=settings.retry,
+            transform_context=transform,
         ):
             renderer.handle(event)
     if session is not None:
@@ -161,16 +269,17 @@ async def _run_repl(
     permissions: Permissions,
     session: Session | None,
     history: list[AgentMessage],
+    settings: _RunSettings,
 ) -> int:
     console = Console()
-    tools = coding_tools(cwd)
     skills = discover_skills(cwd)
-    system_prompt = build_system_prompt(tools, cwd, skills=skills)
     renderer = Renderer(console)
     approver = _make_approver(console)
     registry = build_registry(cwd, skills=skills)
 
     async with open_model(provider=provider, model=model, reasoning=reasoning) as m:
+        tools = _build_tools(m, cwd, permissions, approver, settings)
+        system_prompt = build_system_prompt(tools, cwd, skills=skills)
         ctx = CommandContext(
             console=console, history=history, tools=tools, permissions=permissions, model=m,
             registry=registry, store=store, session=session, cwd=cwd,
@@ -199,21 +308,32 @@ async def _run_repl(
             else:
                 prompt_to_run = line
 
-            history.append(user_message(prompt_to_run))
-            await _run_turn(m, tools, history, system_prompt, renderer, permissions, approver)
+            submitted = await _apply_prompt_submit(settings.hooks, prompt_to_run, console)
+            if submitted is None:
+                continue
+            history.append(user_message(submitted))
+            await _run_turn(
+                m, tools, history, system_prompt, renderer, permissions, approver, settings
+            )
             # ctx.session may have been swapped by /resume or /clear.
             if ctx.session is not None:
                 ctx.session.append_new(history)
     return 0
 
 
-async def _run_turn(model, tools, history, system_prompt, renderer: Renderer, permissions, approver) -> None:
+async def _run_turn(
+    model, tools, history, system_prompt, renderer: Renderer, permissions, approver,
+    settings: _RunSettings,
+) -> None:
     """Run one turn as a task so Ctrl-C (SIGINT) can cancel just that turn."""
     loop = asyncio.get_running_loop()
+    transform = _make_transform(model, settings)
 
     async def consume() -> None:
         async for event in run_agent(
-            model, tools, history, system_prompt=system_prompt, permissions=permissions, approver=approver
+            model, tools, history, system_prompt=system_prompt, hooks=settings.hooks,
+            permissions=permissions, approver=approver, retry=settings.retry,
+            transform_context=transform,
         ):
             renderer.handle(event)
 
