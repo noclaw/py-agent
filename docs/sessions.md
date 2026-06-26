@@ -34,10 +34,10 @@ intact) so a resumed conversation replays correctly.
 
 ## Design note: linear vs tree
 
-Pi stores sessions as a *tree* (entries with `parentId`, enabling fork/clone/branch).
-py-agent uses a **linear append log** — far simpler to read and resume, at the cost of
-branching. That's the right tradeoff for an example; a tree could be layered on later (see
-`PLAN.md`). Port reference: `packages/agent/src/harness/session/`.
+A production agent might store sessions as a *tree* (entries with `parentId`, enabling
+fork/clone/branch). py-agent uses a **linear append log** — far simpler to read and resume,
+at the cost of branching. That's the right tradeoff for an example; a tree could be layered
+on later (see `PLAN.md`).
 
 ## Programmatic use
 

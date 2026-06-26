@@ -1,10 +1,9 @@
 # py-agent — Plan & Status
 
-A Python port of the Pi coding-agent. The **agent loop and tools are written in readable
-Python**; the **model / provider / streaming / auth layer is delegated to Pi's
-`@earendil-works/pi-ai`** through the `pi-py` SDK. The goal is an example implementation
-that is (a) easy to read for people learning Python, and (b) a clean starting point for
-personal-assistant / second-brain agents.
+A readable, **standalone** Python coding agent — the agent loop, the tools, and the model
+layer are all plain Python. The goal is an example implementation that is (a) easy to read
+for people learning Python, and (b) a clean starting point for personal-assistant /
+second-brain agents.
 
 The shipped feature set deliberately mirrors **Claude Code** (tools, hooks, slash + markdown
 commands, permissions, sessions, skills, compaction, auto-retry, and sub-agents) so the
@@ -14,20 +13,14 @@ concepts transfer.
 
 ## Architecture
 
-Pi is three layered npm packages. Understanding the split is the whole design:
+Everything is in-process Python; the only thing that leaves the process is the HTTPS call
+to a model provider.
 
-| Layer | npm package | We… |
+| Layer | Where | Notes |
 |---|---|---|
-| **Model / provider / streaming / auth** | `@earendil-works/pi-ai` | **Reuse** via a Node shim (don't reimplement) |
-| **Generic agent loop + harness** | `@earendil-works/pi-agent-core` | **Ported to Python** (loop, turn structure, tool-exec orchestration) |
-| **Coding product** (tools, system prompt, sessions, slash cmds) | `@earendil-works/pi-coding-agent` | **Ported to Python** |
-
-`pi-ai` is the only piece kept as a black box (30+ providers, OAuth, transports, local
-models). The loop and tools — the parts worth learning and customizing — are Python.
-
-There is **no Pi mode that streams raw model output without the full agent**, so `pi-py`
-gained a small Node shim that imports `pi-ai` and exposes `streamSimple` over JSONL; the
-Python loop calls it once per assistant turn.
+| **Model / provider / streaming / auth** | `agent/providers/` + `agent/wire.py` | Native over `httpx`: `openai_compat` (OpenAI + local/OpenAI-compatible) and `anthropic` backends; route a transport we don't ship via the `Provider` protocol |
+| **Agent loop + harness** | `agent/loop.py` | Turn structure, tool-exec orchestration, gating/retry/compaction seams |
+| **Coding product** (tools, system prompt, sessions, commands, skills) | `agent/tools/`, `agent/*.py` | Plain Python |
 
 ```
 ┌─────────────────────────── Python (py-agent) ────────────────────────────┐
@@ -36,28 +29,26 @@ Python loop calls it once per assistant turn.
 │    │        gated by:  hooks → permissions → approval                     │
 │    │ per turn: stream(context{system, messages, tools})                  │
 │    ▼                                                                      │
-│  pi_py_sdk.PiModelClient  ──JSONL──┐                                      │
+│  model.py ──by api──> providers/  (openai_compat · anthropic)            │
 └──────────────────────────────────────┼───────────────────────────────────┘
-                                        ▼
-              Node shim  ──imports──>  @earendil-works/pi-ai
-              (providers, auth, transports, local models)
+                                        ▼  httpx (SSE)
+                          provider HTTP APIs (OpenAI-compatible / Anthropic)
 ```
+
+The native model layer replaced an earlier out-of-process approach — see the (now complete)
+[`PROVIDERS.md`](PROVIDERS.md) migration design.
 
 ---
 
 ## Status — what's built ✅
 
-**`pi-py` 0.2.0** (published to PyPI) — added `PiModelClient`/`PiModelClientSync` + the
-Node shim (`_shim/stream.mjs`) bridging pi-ai's `streamSimple`. `PiAgent` (full-agent RPC
-client) left untouched.
-
-**`py-agent`** depends on `pi-py-sdk>=0.2.0` from PyPI. Core phases complete:
+Pure-Python dependencies (`httpx`, `pydantic`, `rich`) — no Node, no subprocess. Core phases
+complete:
 
 | Phase | Status | Where |
 |---|---|---|
-| 0. pi-py model-streaming client + shim | ✅ | `pi-py` repo |
 | 1. Scaffold (uv, `pya` CLI, src layout) | ✅ | `pyproject.toml`, `src/agent/` |
-| 2. Core types (messages, events, `Tool`, converters) | ✅ | `types.py` |
+| 2. Core types (messages, events, `Tool`, converters) | ✅ | `types.py`, `wire.py` |
 | 3. Model adapter (`Model`, `ModelLike`, `open_model`) | ✅ | `model.py` |
 | 4. Tools — full set read/write/edit/bash/grep/find/ls | ✅ | `tools/` |
 | 5. Agent loop (`run_agent`, parallel/sequential exec, gating, cancel) | ✅ | `loop.py` |
@@ -89,10 +80,10 @@ Beyond the seven core phases, these optional features are also built:
 - ✅ **Model registry + selection** — custom/local models via `.pya/models.json`
   (`models_registry.py`), selectable by `--model`/`/model` and listed by `pya models`;
   `/model` with no arg opens a dependency-free fuzzy picker (`picker.py`).
-- ✅ **Native provider layer** (`PROVIDERS.md`, Phases 1–2) — model calls go directly to
-  provider HTTP APIs over httpx (`agent/providers/`: `openai-completions` + `anthropic-messages`,
-  with Claude Pro/Max OAuth); `wire.py` holds the native types; **`pi_py_sdk` and Node are
-  removed**. Exotic transports (Bedrock/Vertex/Azure) are out of scope — add a `Provider`.
+- ✅ **Native provider layer** (`agent/providers/`) — model calls go directly to provider
+  HTTP APIs over httpx (`openai-completions` + `anthropic-messages` backends); `wire.py`
+  holds the native message/stream types. No Node, no subprocess. Exotic transports
+  (Bedrock/Vertex/Azure) are out of scope — add a `Provider`. Design: `PROVIDERS.md`.
 
 **Tests:** ~149 unit (scripted fake-model fixture + `httpx.MockTransport`, no network; the
 picker's interactive path runs through a PTY) + a few gated live integration tests
@@ -133,8 +124,8 @@ unification.)
 
 ### 3. Images / vision
 
-Read-tool image attachments + passing `ImageContent` through to the model (pi-ai already
-supports it). Mostly plumbing.
+Read-tool image attachments + passing image content blocks through to the model (both
+provider backends support image input). Mostly plumbing.
 
 ### 4. Web tools (`web_fetch` / `web_search`)
 

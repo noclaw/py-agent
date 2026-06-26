@@ -1,13 +1,11 @@
 """Core data types for the agent.
 
-Port target: ``packages/agent/src/types.ts``.
-
 Three things live here:
 
 1. **Messages** — the in-memory conversation (:class:`UserMessage`,
    :class:`AssistantMessage`, :class:`ToolResultMessage`) and :func:`to_llm_messages`,
-   the converter to the pi-ai wire format that
-   :meth:`pi_py_sdk.model.PiModelClient.stream` consumes (Pi calls this ``convertToLlm``).
+   the converter to the provider wire format the model layer consumes (the
+   ``convertToLlm`` seam).
 2. **The ``Tool`` protocol** — what a tool is (name, description, a Pydantic parameter
    model that becomes JSON Schema, and an ``execute`` coroutine), plus :class:`ToolResult`.
 3. **Agent events** — the small dataclasses the loop emits for the renderer.
@@ -59,7 +57,7 @@ __all__ = [
 
 
 def now_ms() -> int:
-    """Current Unix time in milliseconds (the ``timestamp`` pi-ai messages carry)."""
+    """Current Unix time in milliseconds (the ``timestamp`` wire messages carry)."""
     return int(time.time() * 1000)
 
 
@@ -68,10 +66,9 @@ def now_ms() -> int:
 # ---------------------------------------------------------------------------
 #
 # A turn of conversation is a list of these. The assistant message is kept as the *exact*
-# object pi-ai streamed back (:class:`pi_py_sdk.AssistantMessage`) so it can be replayed
-# verbatim — preserving thinking/tool signatures that providers require for multi-turn
-# continuity. User and tool-result messages we construct ourselves, so they're plain
-# dataclasses with a ``to_wire`` method.
+# streamed assistant message so it can be replayed verbatim — preserving thinking/tool
+# signatures that providers require for multi-turn continuity. User and tool-result
+# messages we construct ourselves, so they're plain dataclasses with a ``to_wire`` method.
 
 
 @dataclass
@@ -102,14 +99,14 @@ class ToolResultMessage:
             "role": "toolResult",
             "toolCallId": self.tool_call_id,
             "toolName": self.tool_name,
-            # pi-ai expects content as a list of blocks.
+            # The wire format expects content as a list of blocks.
             "content": [{"type": "text", "text": self.content}],
             "isError": self.is_error,
             "timestamp": self.timestamp,
         }
 
 
-#: The assistant message is pi-ai's own model, replayed verbatim (see note above).
+#: The assistant message, replayed verbatim (see note above).
 AssistantMessage = LlmAssistantMessage
 
 #: Anything that can appear in the conversation history.
@@ -133,8 +130,8 @@ def tool_result_message(
 def _assistant_to_wire(message: "AssistantMessage") -> dict[str, Any]:
     """Serialize a streamed assistant message back to a wire dict, full fidelity."""
     if isinstance(message, BaseModel):
-        # camelCase field names are stored verbatim by pi_py_sdk, and extra="allow"
-        # preserves provider signatures; keep nulls out to mirror what pi-ai sent.
+        # camelCase field names are stored verbatim, and extra="allow"
+        # preserves provider signatures; keep nulls out to mirror what the provider sent.
         return message.model_dump(exclude_none=True)
     if isinstance(message, dict):
         return message
@@ -142,7 +139,7 @@ def _assistant_to_wire(message: "AssistantMessage") -> dict[str, Any]:
 
 
 def message_to_wire(message: AgentMessage) -> dict[str, Any]:
-    """Serialize one history message to its pi-ai wire dict (used by the model and by
+    """Serialize one history message to its wire dict (used by the model and by
     session persistence)."""
     if isinstance(message, (UserMessage, ToolResultMessage)):
         return message.to_wire()
@@ -176,10 +173,10 @@ def message_from_wire(data: dict[str, Any]) -> AgentMessage:
 
 
 def to_llm_messages(history: list[AgentMessage]) -> list[dict[str, Any]]:
-    """Convert conversation history to the pi-ai wire messages the model consumes.
+    """Convert conversation history to the wire messages the model consumes.
 
     This is the ``convertToLlm`` seam: it's where in-memory message objects become the
-    list passed to :meth:`pi_py_sdk.model.PiModelClient.stream`.
+    list passed to the provider's stream.
     """
     return [message_to_wire(message) for message in history]
 
@@ -247,7 +244,7 @@ class Tool(ABC):
 
     @classmethod
     def to_wire(cls) -> dict[str, Any]:
-        """The tool definition pi-ai sends to the model."""
+        """The tool definition sent to the model."""
         return {"name": cls.name, "description": cls.description, "parameters": cls.json_schema()}
 
 
@@ -282,7 +279,7 @@ class TurnStart(AgentEvent):
 class AssistantDelta(AgentEvent):
     """A streaming chunk of the assistant message (text/thinking/tool-call delta).
 
-    Wraps the raw pi-ai :class:`~pi_py_sdk.StreamEvent` so the renderer can show live
+    Wraps the raw :class:`StreamEvent` so the renderer can show live
     output without re-deriving it.
     """
 

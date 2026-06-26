@@ -1,12 +1,12 @@
 # py-agent docs
 
-py-agent is a readable Python coding agent: the loop and tools are Python, the model
-layer is delegated to Pi's `pi-ai` via the `pi-py` SDK. These docs explain the design and
+py-agent is a readable Python coding agent: the loop and tools are Python, and the model
+layer talks directly to provider HTTP APIs (native, httpx). These docs explain the design and
 the extension seams. The [top-level README](../README.md) is the quick tour; start there
 to install and run.
 
 ## Understand it
-- [Architecture](architecture.md) — the layering, the Node shim, and a turn's lifecycle.
+- [Architecture](architecture.md) — the layering and a turn's lifecycle.
 - [The agent loop](agent-loop.md) — a guided read of `loop.py`.
 - [Models & providers](models-and-providers.md) — how the model layer works, credentials,
   local models, switching models.

@@ -1,9 +1,9 @@
 """Command-line entry point (``pya``).
 
-Phase 1 wires a runnable skeleton: ``--version``, a ``models`` smoke command that proves
-the whole stack (this package -> pi-py -> Node shim -> pi-ai) works end to end, and a
-default command that launches the (still-stubbed) interactive app. The real arg surface
-(model/provider/cwd/one-shot/no-session) fills in alongside the loop and app phases.
+Phase 1 wires a runnable skeleton: ``--version``, a ``models`` command that lists available
+models, and a default command that launches the (still-stubbed) interactive app. The real
+arg surface (model/provider/cwd/one-shot/no-session) fills in alongside the loop and app
+phases.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from .config import DEFAULT_MODEL, DEFAULT_PROVIDER
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="pya",
-        description="A readable Python coding agent (model layer via pi-py/pi-ai).",
+        description="A readable Python coding agent.",
     )
     parser.add_argument("--version", action="version", version=f"pya {__version__}")
     parser.add_argument(

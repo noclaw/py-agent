@@ -1,7 +1,5 @@
 """System-prompt builder.
 
-Port target: ``packages/coding-agent/src/core/system-prompt.ts``.
-
 The prompt is assembled programmatically from the tool set, so adding or removing a tool
 updates it automatically: each tool contributes a one-line ``prompt_snippet`` to the
 "Available tools" list and any ``prompt_guidelines`` to the deduped "Guidelines" list.
@@ -23,7 +21,7 @@ BASE_PERSONA = (
     ", verifiable steps and use the tools rather than guessing."
 )
 
-#: Always-included guideline bullets (Pi adds similar ones unconditionally).
+#: Always-included guideline bullets (always included).
 ALWAYS_ON_GUIDELINES = (
     "Be concise and direct; avoid unnecessary preamble.",
     "Show file paths clearly so the user can follow along.",
@@ -31,7 +29,7 @@ ALWAYS_ON_GUIDELINES = (
     "Stop and report once the task is done; don't keep calling tools needlessly.",
 )
 
-#: Project context files to auto-load (first match wins), like Pi's AGENTS.md/CLAUDE.md.
+#: Project context files to auto-load (first match wins), like AGENTS.md / CLAUDE.md.
 PROJECT_CONTEXT_FILES = ("AGENTS.md", "CLAUDE.md")
 
 

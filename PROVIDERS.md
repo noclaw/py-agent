@@ -1,6 +1,13 @@
-# PROVIDERS.md — native Python model layer (eliminate `pi_py_sdk`)
+# PROVIDERS.md — native Python model layer (design doc, **completed & archived**)
 
-Status: **Phases 1 & 2 shipped — `pi_py_sdk` and Node fully removed.** The model layer is
+> **Historical.** This is the design/migration plan for replacing the original
+> out-of-process model layer with the native Python one. It is **done** — the native layer
+> shipped and the old dependency was removed. The doc is kept for the rationale and the
+> `Provider`-protocol extension model; it intentionally still names the old components it
+> replaced. For current usage see [`docs/models-and-providers.md`](docs/models-and-providers.md)
+> and [`docs/architecture.md`](docs/architecture.md).
+
+Status: **Phases 1 & 2 shipped — the old SDK and Node fully removed.** The model layer is
 now native Python (httpx) talking directly to provider HTTP APIs.
 
 **Phase 1 (done):** native OpenAI-compatible backend (`providers/openai_compat.py`).

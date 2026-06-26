@@ -10,7 +10,7 @@ have to run the code, but you can — every snippet uses the real API.
 
 ## The five parts of any agent
 
-Strip away the features and every coding agent — py-agent, Claude Code, Pi — is the same
+Strip away the features and every coding agent — py-agent, Claude Code — is the same
 five pieces. We'll name them once here and tag each tutorial with the parts it touches:
 
 1. **Model adapter** — turns "a conversation + some tools" into a streamed model response.

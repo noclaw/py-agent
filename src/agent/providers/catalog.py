@@ -1,12 +1,11 @@
 """A tiny static catalog of known providers (and a little model metadata).
 
-This replaces pi-ai's large auto-generated catalog with just what the native layer needs to
-*route* a request: for a given provider/model, which API flavor, base URL, and API-key env
-var to use. Custom/local models bring their own ``api``/``baseUrl`` via ``.pya/models.json``
-(see :mod:`agent.models_registry`) and don't need an entry here.
+A small static catalog: just what the native layer needs to *route* a request: for a given
+provider/model, which API flavor, base URL, and API-key env var to use. Custom/local models
+bring their own ``api``/``baseUrl`` via ``.pya/models.json`` (see
+:mod:`agent.models_registry`) and don't need an entry here.
 
-Phase 1 implements the ``openai-completions`` API natively; ``anthropic-messages`` routes to
-the transitional pi backend until Providers Phase 2 (see ``PROVIDERS.md``).
+Both the ``openai-completions`` and ``anthropic-messages`` APIs are implemented natively.
 """
 
 from __future__ import annotations
@@ -74,7 +73,7 @@ def builtin_models() -> list[dict[str, str]]:
 
 def route_for(provider: str | None, model_id: str) -> Route | None:
     """Resolve the route for a built-in ``provider``/``model_id``, or ``None`` if unknown
-    (the caller then falls back to the transitional pi backend)."""
+    (the caller then errors)."""
     if provider and provider in KNOWN_PROVIDERS:
         return KNOWN_PROVIDERS[provider]
     return None

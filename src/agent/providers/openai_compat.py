@@ -3,7 +3,7 @@
 Covers OpenAI and the many servers that speak the same protocol: Ollama, LM Studio, vLLM,
 llama.cpp, Together, Groq, OpenRouter, … This is Providers Phase 1 (see ``PROVIDERS.md``).
 
-It converts py-agent's wire messages (pi-ai shape) to OpenAI Chat Completions, streams the
+It converts py-agent's wire messages to OpenAI Chat Completions, streams the
 SSE response, assembles tool-call argument fragments, and emits the same ``StreamEvent`` /
 ``AssistantMessage`` objects the loop already consumes — so nothing downstream changes.
 """
@@ -34,7 +34,7 @@ def _text_of(content: Any) -> str:
 
 
 def to_openai_messages(system_prompt: str | None, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Convert pi-ai wire messages to OpenAI Chat Completions messages."""
+    """Convert wire messages to OpenAI Chat Completions messages."""
     out: list[dict[str, Any]] = []
     if system_prompt:
         out.append({"role": "system", "content": system_prompt})

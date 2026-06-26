@@ -33,8 +33,8 @@ the one place in-memory messages become the dicts the model sees. See `agent/typ
 
 ## The model adapter
 
-The only thing that leaves your process is the model call. `open_model()` starts the pi-ai
-shim and hands you a `Model` whose `.stream(...)` yields events as the response arrives:
+The only thing that leaves your process is the model call. `open_model()` hands you a
+`Model` whose `.stream(...)` yields events as the response arrives:
 
 ```python
 from agent.model import open_model

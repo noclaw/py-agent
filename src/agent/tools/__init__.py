@@ -1,7 +1,5 @@
 """Tool registry and bundles.
 
-Port target: ``packages/coding-agent/src/core/tools/index.ts``.
-
 ``coding_tools(cwd)`` returns the full built-in set (read/write/edit/bash/grep/find/ls),
 and ``read_only_tools(cwd)`` the non-mutating subset. This package is the seam where
 second-brain / assistant users swap the coding toolset for their own (e.g. note/recall/

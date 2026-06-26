@@ -4,7 +4,7 @@ Guidance for working in this repository.
 
 ## What this is
 
-`py-agent` is a Python coding agent originally ported from Pi. **The whole thing is Python**
+`py-agent` is a readable, standalone Python coding agent. **The whole thing is Python**
 — the agent loop, the tools, and (as of Providers Phase 2, see `PROVIDERS.md`) the model
 layer, which now talks directly to provider HTTP APIs over `httpx`. No Node, no shim. It is
 an *example implementation* — optimized for being read and modified (learning Python; a base
@@ -15,27 +15,22 @@ for assistant / second-brain agents), not for maximal features.
 by implementing the small `Provider` protocol. We deliberately support a limited set of
 providers — exotic transports (Bedrock/Vertex/Azure) are a user's custom code, not ours.
 
-> History: the model layer used to be delegated out-of-process to Pi's `pi-ai` via the
-> `pi-py` SDK + a Node shim. That dependency was removed in Providers Phase 2. Some
-> port-target comments still reference the Pi/TypeScript originals — that's lineage, not a
-> runtime dependency.
-
 ## Layout
 
 ```
 src/agent/
-  cli.py            # `pya` entry point                 (← coding-agent/src/cli)
+  cli.py            # `pya` entry point
   app.py            # REPL + one-shot runner; policy wiring (perms/hooks/retry/compaction)
-  loop.py           # the agent loop                       (← agent/src/agent-loop.ts)
-  types.py          # AgentMessage, events, Tool protocol  (← agent/src/types.ts)
+  loop.py           # the agent loop
+  types.py          # AgentMessage, events, Tool protocol
   model.py          # Model adapter: routes a turn to a native provider by API flavor
   wire.py           # native StreamEvent / AssistantMessage / ToolCall (the model contract)
   providers/        # native httpx model layer: openai_compat, anthropic, oauth, catalog
   models_registry.py# custom/local models from .pya/models.json
   settings.py       # ~/.pya/settings.toml: provider keys, allowlist, default
   picker.py         # fuzzy model picker for /model
-  system_prompt.py  # build_system_prompt                  (← coding-agent/.../system-prompt.ts)
-  config.py         # settings + defaults                  (← coding-agent/src/config.ts)
+  system_prompt.py  # build_system_prompt
+  config.py         # settings + defaults
   render.py         # event -> terminal rendering
   permissions.py    # tool gating: modes + allow/deny rules + approval
   hooks.py          # PreToolUse / PostToolUse / UserPromptSubmit callbacks
@@ -60,7 +55,7 @@ Native Python over `httpx` — no subprocess. The pieces:
 - `providers/base.py` — the `Provider` protocol: `stream(...)` + `list_models()`.
 - `providers/openai_compat.py` — OpenAI Chat Completions (OpenAI + local/OpenAI-compatible).
 - `providers/anthropic.py` — Anthropic Messages (streaming, thinking + signature, tool use).
-- `providers/oauth.py` — Claude Pro/Max OAuth via `~/.pi/agent/auth.json` (no API key needed).
+- `providers/oauth.py` — generic OAuth toolkit (provider-neutral; not wired to a provider today).
 - `providers/catalog.py` — static routing (provider → api/baseUrl/env) + a curated model list.
 - `providers/http.py` — shared httpx SSE iteration.
 

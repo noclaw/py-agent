@@ -1,8 +1,7 @@
-"""Native message & stream-event types — the project's own model-layer contract.
+"""The project's own message & stream-event types — the model-layer contract.
 
-These replace the types previously imported from ``pi_py_sdk`` (Providers Phase 2 — see
-``PROVIDERS.md``). Shapes deliberately mirror what pi-ai exposed so the loop, renderer,
-sessions, and tests are unchanged apart from their import line.
+Shapes are intentionally simple so the loop, renderer, and sessions stay decoupled from
+any provider.
 
 - :class:`AssistantMessage` — one assistant turn, kept verbatim so it round-trips back to
   the provider (preserving e.g. Anthropic thinking ``signature``s). ``extra="allow"`` keeps

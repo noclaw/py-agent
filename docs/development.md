@@ -39,9 +39,9 @@ uv run pytest -m integration          # live tests, gated (need a real key)
 PYA_LIVE_LLM=1 ANTHROPIC_API_KEY=… uv run pytest -m integration   # tests that call a model
 ```
 
-Integration tests are skipped unless `pi`/`node` are present, and the ones that call a
-model additionally require `PI_LIVE_LLM=1` (so the default `uv run pytest` never hits the
-network). They default to a cheap model; override with `PI_LIVE_MODEL` / `PI_LIVE_PROVIDER`.
+Integration tests that call a model are gated by `PYA_LIVE_LLM=1` plus a real
+`ANTHROPIC_API_KEY` (so the default `uv run pytest` never hits the network). They default to
+a cheap model; override with `PYA_LIVE_MODEL` / `PYA_LIVE_PROVIDER`.
 
 ### The fake-model fixture
 

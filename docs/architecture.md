@@ -1,18 +1,17 @@
 # Architecture
 
-py-agent began as a port of [Pi](https://pi.dev) and keeps Pi's layering, but every layer
-is now Python:
+py-agent is a standalone Python coding agent — every layer is plain Python:
 
-| Layer | Origin | py-agent |
-|---|---|---|
-| Model / provider / streaming / auth | `@earendil-works/pi-ai` (TypeScript) | **native Python** (`agent/providers/`, httpx) |
-| Generic agent loop + harness | `@earendil-works/pi-agent-core` | **ported to Python** |
-| Coding product (tools, prompt, sessions, commands) | `@earendil-works/pi-coding-agent` | **ported to Python** |
+| Layer | py-agent |
+|---|---|
+| Model / provider / streaming / auth | **native Python** (`agent/providers/`, httpx) |
+| Generic agent loop + harness | **plain Python** (`loop.py`, `types.py`) |
+| Coding product (tools, prompt, sessions, commands) | **plain Python** (`tools/`, `system_prompt.py`, `sessions.py`, `commands.py`) |
 
-Originally the model layer was delegated out-of-process to `pi-ai` via a Node shim. That
-dependency was removed (Providers Phases 1–2, see [`PROVIDERS.md`](../PROVIDERS.md)) in favor
-of a small native layer — at the cost of breadth (we ship OpenAI-compatible + Anthropic;
-exotic transports are user custom code) but with no Node and full control of local models.
+The native model layer is small and focused: we ship OpenAI-compatible + Anthropic; exotic
+transports are user custom code (implement the `Provider` protocol). The tradeoff buys no
+extra runtime, no out-of-process bridge, and full control of local models (Providers Phases
+1–2, see [`PROVIDERS.md`](../PROVIDERS.md)).
 
 ## The model layer
 

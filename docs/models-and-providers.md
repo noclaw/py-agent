@@ -112,7 +112,7 @@ support it. Thinking is streamed and rendered dimmed.
 
 ## Local & custom models
 
-`pi-ai` reaches local runtimes (Ollama, LM Studio, vLLM, …) and any OpenAI-compatible
+py-agent reaches local runtimes (Ollama, LM Studio, vLLM, …) and any OpenAI-compatible
 endpoint by treating them as a model with a `baseUrl` and an API flavor (usually
 `openai-completions`) rather than a built-in catalog entry. py-agent makes these selectable
 from the CLI via a small **model registry**: a `models.json` under `.pya/`.
@@ -120,8 +120,8 @@ from the CLI via a small **model registry**: a `models.json` under `.pya/`.
 ### Declare a model
 
 Create `~/.pya/models.json` (applies everywhere) or `<cwd>/.pya/models.json` (just this
-project; project entries override user ones by `provider/id`). The shape matches pi's own
-`models.json` — a provider block with the connection fields and a list of models:
+project; project entries override user ones by `provider/id`). The shape is a provider block
+with the connection fields and a list of models:
 
 ```json
 {
@@ -154,13 +154,12 @@ In the REPL, `/model` (no args) shows them in the fuzzy picker alongside built-i
 `/model local/qwen3` switches directly. The model's `apiKey` is sent as the credential; for
 built-in providers, credentials resolve via the provider's env var as above.
 
-Under the hood the registry flattens each entry into a full pi-ai model object and streams
-it as a `model=` spec (the `PiModelClient.stream` seam accepts an id *or* a full object).
-See `agent/models_registry.py`.
+Under the hood the registry flattens each entry into a full model spec; the provider streams
+it directly. See `agent/models_registry.py`.
 
 ## Under the hood
 
-`agent/model.py` wraps `pi_py_sdk.PiModelClient`:
+`agent/model.py` routes to a native provider:
 
 ```python
 from agent.model import open_model
@@ -170,5 +169,5 @@ async with open_model(provider="anthropic", model="claude-sonnet-4-6", reasoning
         ...   # StreamEvent: text_delta / thinking_delta / toolcall_end / done / error
 ```
 
-`open_model` starts the Node shim subprocess and yields a `Model`; extra keyword args
-(e.g. `maxTokens`, `temperature`) pass through to pi-ai's stream options verbatim.
+`open_model` yields a `Model`; extra keyword args (e.g. `maxTokens`, `temperature`) pass
+through to the provider's request verbatim.

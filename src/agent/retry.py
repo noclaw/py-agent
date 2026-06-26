@@ -1,8 +1,6 @@
 """Auto-retry for transient model errors.
 
-Port target: ``packages/agent/src/harness/`` retry handling (Pi's ``retry.enabled/maxRetries``).
-
-pi-ai surfaces a failed turn as a terminal ``error`` :class:`~pi_py_sdk.StreamEvent` (the
+A failed turn surfaces as a terminal ``error`` :class:`StreamEvent` (the
 final :class:`AssistantMessage` carries ``stopReason == "error"``). That makes retry a clean
 wrapper around the per-turn stream: if a turn ends in ``error`` (not a user ``aborted``),
 wait a backed-off delay and stream the same turn again, up to ``max_retries`` times.

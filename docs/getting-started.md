@@ -9,7 +9,7 @@ for everyday use.
 - Python ≥ 3.11 and [`uv`](https://docs.astral.sh/uv/) (or pip). No Node required.
 - Credentials: a provider API key in the environment — `export ANTHROPIC_API_KEY=...` /
   `export OPENAI_API_KEY=...` (or another provider's key). Local OpenAI-compatible servers
-  usually need none. No Node, no `pi`.
+  usually need none. No Node, no extra runtime.
 
 The model layer is native Python (httpx) talking directly to provider HTTP APIs —
 OpenAI-compatible (OpenAI + local servers) and Anthropic. See

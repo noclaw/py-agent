@@ -2,7 +2,7 @@
 
 A small, readable renderer built on ``rich``: it streams assistant text (and optionally
 thinking), announces tool calls and their results, and prints a usage summary when the run
-ends. Port reference: ``packages/coding-agent/src/modes/interactive/``.
+ends.
 
 The renderer is deliberately stateless except for a little bookkeeping (whether we're
 mid-line, and accumulated token usage) so it's easy to follow and to test.

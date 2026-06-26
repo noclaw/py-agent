@@ -1,4 +1,4 @@
-"""Skills — model-aware capabilities loaded from markdown, modeled on Claude Code / Pi.
+"""Skills — model-aware capabilities loaded from markdown, modeled on Claude Code.
 
 A skill is a directory with a ``SKILL.md`` file: frontmatter (``name``, ``description``)
 plus instructions in the body. Skills differ from slash commands: slash commands are
@@ -10,8 +10,6 @@ skill directory.
 Discovery (project overrides user by name):
   - ``~/.pya/skills/<name>/SKILL.md``        (user)
   - ``<cwd>/.pya/skills/<name>/SKILL.md``    (project)
-
-Port reference: ``packages/agent/src/harness/skills.ts`` (``formatSkillsForSystemPrompt``).
 """
 
 from __future__ import annotations

@@ -1,6 +1,6 @@
 # py-agent
 
-A readable Python coding agent (originally ported from [Pi](https://pi.dev)). **All of it
+A readable Python coding agent. **All of it
 is Python** — the agent loop, the tools, and the model layer, which talks directly to
 provider HTTP APIs over `httpx`. No Node, no subprocess. It supports OpenAI-compatible
 endpoints (OpenAI + local servers: Ollama, LM Studio, vLLM, …) and Anthropic.
@@ -48,7 +48,7 @@ provider. To support a transport we don't ship, implement the small `Provider` p
   or `~/.pya/settings.toml` (no `export` needed; also scopes which providers/models the CLI
   offers). Local servers usually need none.
 
-No Node and no `pi` install are required — anywhere.
+No Node or other runtime is required — it's pure Python.
 
 ## Setup
 
@@ -224,7 +224,7 @@ Deeper guides live in [`docs/`](docs/README.md): [architecture](docs/architectur
 
 ```bash
 uv run pytest                 # unit tests (no Node)
-uv run pytest -m integration  # live tests (need Node + pi-ai)
+uv run pytest -m integration  # live tests (gated; need a provider API key)
 ```
 
 ## License

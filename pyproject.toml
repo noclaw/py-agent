@@ -5,12 +5,12 @@ build-backend = "hatchling.build"
 [project]
 name = "py-agent"
 version = "0.0.1"
-description = "A readable Python coding agent — native loop and tools, model layer via pi-py/pi-ai"
+description = "A readable, standalone Python coding agent (native loop, tools, and model layer)"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Jeff Jacobsen" }]
-keywords = ["pi", "agent", "llm", "coding-agent", "assistant", "second-brain"]
+keywords = ["agent", "llm", "coding-agent", "assistant", "second-brain"]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
     "Intended Audience :: Developers",
@@ -46,8 +46,8 @@ packages = ["src/agent"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-# Integration tests (real Node + pi-ai) are opt-in: run them with `pytest -m integration`.
+# Integration tests (real provider calls) are opt-in: run them with `pytest -m integration`.
 addopts = "-m 'not integration'"
 markers = [
-    "integration: requires Node + the pi-ai runtime (run with -m integration)",
+    "integration: makes a real provider API call (run with -m integration)",
 ]

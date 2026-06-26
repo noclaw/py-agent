@@ -8,7 +8,7 @@ For the full tour see the [README](README.md); for depth see [`docs/`](docs/READ
 - **Python ≥ 3.11** and [`uv`](https://docs.astral.sh/uv/) (recommended) — or pip. No Node.
 - **Credentials** — a provider API key, via an env var (`export ANTHROPIC_API_KEY=...`),
   **`pya auth set anthropic`** (stored in `~/.pya/auth.json`), or `~/.pya/settings.toml` — so
-  you don't have to export. Local OpenAI-compatible servers usually need none. No Node, no `pi`.
+  you don't have to export. Local OpenAI-compatible servers usually need none. No Node.
 
 ## 2. Install
 
@@ -77,8 +77,8 @@ credential resolution order and local/self-hosted models, see
   `pya -c` continues the last one for this directory.
 - **Custom commands / skills** — `.pya/commands/` and `.pya/skills/` (per project) or
   `~/.pya/...` (per user). See [commands](docs/commands.md) / [skills](docs/skills.md).
-- **Provider credentials** — your environment, or Pi's OAuth login at `~/.pi/agent/`.
-  py-agent itself keeps no credentials.
+- **Provider credentials** — your environment, `pya auth set` (`~/.pya/auth.json`), or
+  `~/.pya/settings.toml`. py-agent keeps no credentials of its own beyond `~/.pya`.
 
 ## Troubleshooting
 

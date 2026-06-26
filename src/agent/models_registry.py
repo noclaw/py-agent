@@ -1,10 +1,8 @@
 """Custom/local model registry — a small ``models.json`` for non-built-in models.
 
-Port target: ``packages/coding-agent/core/model-registry.ts`` (the local-models slice).
-
-`pi-ai` knows a large *built-in* catalog (Anthropic, OpenAI, …) which the CLI lists and
-selects by id. This module adds the other half: models `pi-ai` does **not** ship — a local
-Ollama / LM Studio / vLLM server, or any OpenAI-compatible endpoint — declared in a
+The built-in catalog covers a large set of models (Anthropic, OpenAI, …) which the CLI
+lists and selects by id. This module adds the other half: models not in that catalog — a
+local Ollama / LM Studio / vLLM server, or any OpenAI-compatible endpoint — declared in a
 ``models.json`` so they're selectable from the CLI just like built-in ones.
 
 Discovery mirrors the rest of ``.pya/`` (project overrides user by ``provider/id``):
@@ -12,8 +10,7 @@ Discovery mirrors the rest of ``.pya/`` (project overrides user by ``provider/id
   - ``~/.pya/models.json``         (user)
   - ``<cwd>/.pya/models.json``     (project)
 
-File shape (matches pi's own ``models.json``): provider blocks carry the connection
-fields, each with a list of models::
+File shape: provider blocks carry the connection fields, each with a list of models::
 
     {
       "providers": {
@@ -29,8 +26,8 @@ fields, each with a list of models::
     }
 
 A :class:`ModelInfo` for a custom model carries a flattened **spec** dict (provider fields
-merged into the model) ready to hand to :meth:`pi_py_sdk.PiModelClient.stream` as a full
-``model=`` object — the seam that lets a local endpoint be streamed without a catalog entry.
+merged into the model) ready to hand to the provider's stream as a full ``model=`` object —
+the seam that lets a local endpoint be streamed without a catalog entry.
 """
 
 from __future__ import annotations
@@ -45,7 +42,7 @@ __all__ = ["ModelInfo", "ModelRegistry", "load_model_registry", "merge_catalog"]
 #: Provider-level keys merged into each model's spec (the connection, not the model).
 _PROVIDER_FIELDS = ("baseUrl", "api", "apiKey", "authHeader", "headers")
 
-#: Defaults filled in for fields pi-ai's model object requires, so a minimal models.json
+#: Defaults filled in for fields the model spec requires, so a minimal models.json
 #: entry (just id + connection) works without crashing the provider's stream code.
 _MODEL_DEFAULTS = {
     "reasoning": False,
@@ -58,7 +55,7 @@ _MODEL_DEFAULTS = {
 
 @dataclass(frozen=True)
 class ModelInfo:
-    """One selectable model. ``spec`` is the full pi-ai model object for custom models, or
+    """One selectable model. ``spec`` is the full model spec for custom models, or
     ``None`` for built-ins (which are selected by ``provider``/``id`` against the catalog)."""
 
     provider: str
@@ -94,7 +91,7 @@ class ModelRegistry:
 
 
 def _model_spec(provider: str, block: dict[str, Any], model: dict[str, Any]) -> dict[str, Any]:
-    """Flatten a provider block + one model entry into a pi-ai model spec."""
+    """Flatten a provider block + one model entry into a model spec."""
     spec: dict[str, Any] = {k: v for k, v in model.items()}
     spec["provider"] = provider
     spec.setdefault("name", model.get("id"))
@@ -130,13 +127,17 @@ class ModelRegistryError(Exception):
     """A ``models.json`` could not be read/parsed."""
 
 
+#: User-level custom-models file (tests override this to isolate the real one).
+USER_MODELS_PATH = Path.home() / ".pya" / "models.json"
+
+
 def load_model_registry(cwd: str | Path = ".") -> ModelRegistry:
     """Load custom models from ``~/.pya/models.json`` then ``<cwd>/.pya/models.json``.
 
     Project entries override user entries with the same ``provider/id``.
     """
     sources = [
-        (Path.home() / ".pya" / "models.json", "user"),
+        (USER_MODELS_PATH, "user"),
         (Path(cwd) / ".pya" / "models.json", "project"),
     ]
     merged: dict[str, ModelInfo] = {}
@@ -147,7 +148,7 @@ def load_model_registry(cwd: str | Path = ".") -> ModelRegistry:
 
 
 def merge_catalog(builtin: list[dict[str, Any]], registry: ModelRegistry) -> list[ModelInfo]:
-    """Combine the built-in catalog (pi-ai ``list_models`` dicts) with custom models.
+    """Combine the built-in catalog rows with custom models.
 
     Returns a sorted list of :class:`ModelInfo`; a custom model shadows a built-in with the
     same ``provider/id``.

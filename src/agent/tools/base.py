@@ -3,8 +3,6 @@
 The :class:`~agent.types.Tool` protocol and :class:`~agent.types.ToolResult`
 live in :mod:`agent.types` (re-exported here). This module adds the helpers the
 concrete tools share: a working-directory base, path resolution, and output truncation.
-
-Port target: ``packages/coding-agent/src/core/tools/`` (``truncate.ts``, ``path-utils.ts``).
 """
 
 from __future__ import annotations
@@ -23,7 +21,7 @@ __all__ = [
     "BaseTool",
 ]
 
-#: Output budgets (whichever is hit first). Roughly mirrors Pi's tool defaults.
+#: Output budgets (whichever is hit first). Roughly mirrors common tool defaults.
 DEFAULT_MAX_LINES = 1000
 DEFAULT_MAX_BYTES = 100_000
 

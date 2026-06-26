@@ -1,6 +1,6 @@
 """The ``task`` tool — spawn a sub-agent with its own toolset and turn budget.
 
-Port target: Claude Code's ``Task`` tool / Pi sub-agents.
+Modeled on Claude Code's ``Task`` tool (sub-agents).
 
 A sub-agent is just a nested :func:`agent.loop.run_agent` run: the tool hands the child a
 fresh history seeded with the caller's prompt, a restricted toolset, and its own ``max_turns``

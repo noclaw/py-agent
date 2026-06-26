@@ -1,13 +1,11 @@
 """Context compaction — summarize old history when it nears the context window.
 
-Port target: ``packages/agent/src/harness/compaction/``.
-
 The loop exposes a ``transform_context`` seam (see :func:`agent.loop.run_agent`): a callback
 run once per turn, *before* streaming, that may return a replacement history. Compaction is
 the canonical use of that seam — it keeps the conversation under the model's context window
 without the loop knowing anything about summarization.
 
-The strategy here is deliberately simple (Pi's branch summarization is much more advanced):
+The strategy here is deliberately simple (simpler than a production summarizer):
 
 1. Estimate the current token footprint from the most recent assistant message's reported
    ``usage`` (falling back to a rough char-based estimate).

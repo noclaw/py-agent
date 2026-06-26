@@ -4,7 +4,16 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
+from agent import models_registry
 from agent.models_registry import ModelRegistry, load_model_registry, merge_catalog
+
+
+@pytest.fixture(autouse=True)
+def _isolate_user_models(tmp_path_factory, monkeypatch):
+    """Don't let the real ~/.pya/models.json leak into these tests."""
+    monkeypatch.setattr(models_registry, "USER_MODELS_PATH", tmp_path_factory.mktemp("home") / "models.json")
 
 
 def _write_models(dir_path, data):

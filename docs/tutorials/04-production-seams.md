@@ -83,7 +83,7 @@ split so it never orphans a tool result from its call). It emits `CompactionStar
 
 ## Auto-retry — surviving a flaky turn
 
-pi-ai reports a failed turn as a terminal `error` event (the final `AssistantMessage` has
+A failed turn surfaces as a terminal `error` event (the final `AssistantMessage` has
 `stopReason == "error"`). That makes retry a tidy wrapper around the per-turn stream: if a
 turn ends in `error` (never a user `aborted`), wait a backed-off delay and stream the same
 turn again, up to `max_retries`. It lives in `_stream_turn` and emits `AgentRetry` events;

@@ -60,7 +60,7 @@ no delta accumulation to do.
 ### Auto-retry
 
 `_stream_turn` streams one assistant turn and, if it ends in a transient model error
-(pi-ai's terminal `error` event), re-streams it per the `retry` policy
+(a terminal `error` event), re-streams it per the `retry` policy
 ([`RetryPolicy`](../src/agent/retry.py): exponential backoff, capped). A user `aborted` is
 never retried. Each retry emits an `AgentRetry(attempt, max_retries, delay, error)` event,
 then the loop sleeps the backoff and tries again; once retries are exhausted the error

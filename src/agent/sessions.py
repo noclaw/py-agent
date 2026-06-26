@@ -1,8 +1,7 @@
 """Session persistence — save and resume conversations as JSONL.
 
-Port reference: ``packages/agent/src/harness/session/`` (Pi uses a *tree* of entries;
-this is the simpler **linear log** the plan recommends for an example — one file per
-session, one JSON object per line).
+(A production agent might store a *tree* of entries enabling fork/clone/branch; we keep
+a simple **linear log** — one file per session, one JSON object per line.)
 
 Layout: ``~/.pya/sessions/<id>.jsonl`` (override the root with ``PYA_SESSIONS_DIR``).
 The first line is a header; each later line wraps one wire message::
