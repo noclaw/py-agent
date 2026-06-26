@@ -46,6 +46,7 @@ Per-project under your working directory, and per-user under `~/.pya/`:
 .pya/
   commands/<name>.md         # custom slash commands   (see commands.md)
   skills/<name>/SKILL.md     # skills                   (see skills.md)
+  models.json                # custom/local models     (see models-and-providers.md)
 ```
 
 Project entries (under `--cwd`) override user entries (`~/.pya/`) with the same name.

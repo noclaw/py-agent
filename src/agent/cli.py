@@ -114,26 +114,32 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _cmd_models(provider: str | None) -> int:
-    """List models via the low-level pi-py model client.
+def _cmd_models(provider: str | None, cwd: str) -> int:
+    """List available models: pi-ai's built-in catalog plus any custom/local models from
+    ``~/.pya/models.json`` / ``<cwd>/.pya/models.json``.
 
-    This is a thin smoke test of the pipeline; the model adapter proper arrives in a
-    later phase. Needs Node + a local ``pi`` install (for the bundled pi-ai).
+    Needs Node + a local ``pi`` install (for the bundled pi-ai).
     """
     from pi_py_sdk import PiError, PiModelClientSync
 
+    from .models_registry import load_model_registry, merge_catalog
+
     try:
         with PiModelClientSync() as client:
-            models = client.list_models(provider)
+            builtin = client.list_models(provider)
     except PiError as exc:
         print(f"[error] {exc}", file=sys.stderr)
         return 1
 
+    models = merge_catalog(builtin, load_model_registry(cwd))
+    if provider is not None:
+        models = [m for m in models if m.provider == provider]
     if not models:
         print("(no models — check your `pi` install / provider config)", file=sys.stderr)
         return 1
-    for model in sorted(models, key=lambda m: (m.get("provider", ""), m.get("id", ""))):
-        print(f"{model.get('provider')}/{model.get('id')}")
+    for m in models:
+        tag = "  [custom]" if m.is_custom else ""
+        print(f"{m.label}{tag}")
     return 0
 
 
@@ -142,7 +148,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "models":
-        return _cmd_models(args.provider)
+        return _cmd_models(args.provider, args.cwd)
 
     # Default: one-shot if -p was given, otherwise the interactive REPL.
     from .app import run

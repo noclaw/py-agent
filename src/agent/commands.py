@@ -13,13 +13,14 @@ to run as the next agent turn (this is what markdown commands do).
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
 from rich.console import Console
 
 from ._markdown import parse_frontmatter
+from .models_registry import ModelInfo
 from .permissions import PermissionMode, Permissions
 from .skills import Skill, discover_skills
 from .types import AgentMessage, Tool
@@ -51,6 +52,8 @@ class CommandContext:
     store: "SessionStore | None" = None
     session: "Session | None" = None
     cwd: str = "."
+    #: Available models (built-in + custom) for the ``/model`` picker; empty until prefetched.
+    models: list[ModelInfo] = field(default_factory=list)
 
 
 @dataclass
@@ -155,7 +158,8 @@ def _cmd_resume(ctx: CommandContext, args: str) -> CommandOutcome:
     model = header.get("model")
     if model and "/" in model:
         provider, name = model.split("/", 1)
-        ctx.model.set_model(name, provider)
+        info = _find_model(ctx, provider, name)  # keep a custom model's spec, if known
+        ctx.model.set_model(info.id, info.provider, spec=info.spec)
     ctx.console.print(f"[dim]resumed {session.id} — {len(messages)} messages[/dim]")
     return CommandOutcome()
 
@@ -171,14 +175,40 @@ def _cmd_tools(ctx: CommandContext, args: str) -> CommandOutcome:
     return CommandOutcome()
 
 
-def _cmd_model(ctx: CommandContext, args: str) -> CommandOutcome:
-    if not args:
-        ctx.console.print(f"current model: [cyan]{ctx.model.name}[/cyan]")
-        return CommandOutcome()
-    provider, model = args.split("/", 1) if "/" in args else (None, args)
-    ctx.model.set_model(model, provider)
+def _switch_model(ctx: CommandContext, info: ModelInfo) -> CommandOutcome:
+    ctx.model.set_model(info.id, info.provider, spec=info.spec)
     ctx.console.print(f"model → [cyan]{ctx.model.name}[/cyan]")
     return CommandOutcome()
+
+
+def _find_model(ctx: CommandContext, provider: str | None, model_id: str) -> ModelInfo:
+    """Match a typed id against the known models; fall back to a built-in id by that name."""
+    for info in ctx.models:
+        if info.id == model_id and (provider is None or info.provider == provider):
+            return info
+    return ModelInfo(provider=provider or ctx.model.provider, id=model_id)  # assume built-in
+
+
+def _cmd_model(ctx: CommandContext, args: str) -> CommandOutcome:
+    if args:
+        provider, model = args.split("/", 1) if "/" in args else (None, args)
+        return _switch_model(ctx, _find_model(ctx, provider, model))
+
+    # No argument: open the interactive picker over the available models.
+    if not ctx.models:
+        ctx.console.print(f"current model: [cyan]{ctx.model.name}[/cyan]")
+        ctx.console.print("[dim](no model list available to pick from — pass an id: /model <id>)[/dim]")
+        return CommandOutcome()
+
+    from .picker import select
+
+    labels = [info.label for info in ctx.models]
+    chosen = select(labels, current=ctx.model.name, prompt="Select a model")
+    if chosen is None:
+        ctx.console.print("[dim](model unchanged)[/dim]")
+        return CommandOutcome()
+    by_label = {info.label: info for info in ctx.models}
+    return _switch_model(ctx, by_label[chosen])
 
 
 def _cmd_mode(ctx: CommandContext, args: str) -> CommandOutcome:

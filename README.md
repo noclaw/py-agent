@@ -87,7 +87,7 @@ In the REPL, lines starting with `/` are commands. Built-ins:
 | `/help` | list available commands |
 | `/clear` | start a fresh conversation |
 | `/tools` | list the available tools |
-| `/model [provider/]model` | show or switch the model |
+| `/model [[provider/]model]` | switch the model by id, or open a fuzzy picker with no arg |
 | `/mode <mode>` | show or set the permission mode |
 | `/sessions` | list saved sessions for this directory |
 | `/resume <id>` | resume a saved session |

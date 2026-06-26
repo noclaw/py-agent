@@ -12,6 +12,7 @@ from agent.commands import (
     load_markdown_commands,
 )
 from agent.model import Model
+from agent.models_registry import ModelInfo
 from agent.permissions import PermissionMode, Permissions
 from agent.tools import coding_tools
 from agent.types import user_message
@@ -73,6 +74,40 @@ def test_model_switch():
     assert ctx.model.name == "anthropic/claude-opus-4-8"
     registry.dispatch("/model claude-haiku-4-5", ctx)  # keep provider
     assert ctx.model.name == "anthropic/claude-haiku-4-5"
+
+
+def test_model_switch_to_custom_sets_spec():
+    ctx, buf, registry = _ctx()
+    spec = {"id": "qwen3", "provider": "local", "api": "openai-completions", "baseUrl": "x"}
+    ctx.models = [ModelInfo(provider="local", id="qwen3", spec=spec, source="user")]
+    registry.dispatch("/model local/qwen3", ctx)
+    assert ctx.model.name == "local/qwen3"
+    assert ctx.model._spec == spec  # the full spec is what gets streamed
+
+
+def test_model_picker_no_args(monkeypatch):
+    ctx, buf, registry = _ctx()
+    spec = {"id": "qwen3", "provider": "local"}
+    ctx.models = [
+        ModelInfo(provider="anthropic", id="claude-opus-4-8"),
+        ModelInfo(provider="local", id="qwen3", spec=spec),
+    ]
+    import agent.picker
+
+    monkeypatch.setattr(agent.picker, "select", lambda *a, **k: "local/qwen3")
+    registry.dispatch("/model", ctx)
+    assert ctx.model.name == "local/qwen3" and ctx.model._spec == spec
+
+
+def test_model_picker_cancel_leaves_unchanged(monkeypatch):
+    ctx, buf, registry = _ctx()
+    ctx.models = [ModelInfo(provider="anthropic", id="claude-opus-4-8")]
+    import agent.picker
+
+    monkeypatch.setattr(agent.picker, "select", lambda *a, **k: None)
+    registry.dispatch("/model", ctx)
+    assert ctx.model.name == "anthropic/claude-sonnet-4-6"  # unchanged
+    assert "unchanged" in buf.getvalue()
 
 
 def test_mode_change_and_invalid():

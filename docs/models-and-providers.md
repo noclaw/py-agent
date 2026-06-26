@@ -13,7 +13,13 @@ uv run pya models                       # list everything pi-ai knows about
 uv run pya models --provider anthropic  # filter to one provider
 ```
 
-In the REPL, `/model claude-opus-4-8` (or `/model openai/gpt-...`) switches at runtime.
+In the REPL, switch at runtime two ways:
+
+- `/model claude-opus-4-8` (or `/model openai/gpt-5.1`) — switch by id.
+- `/model` with **no argument** opens an interactive **fuzzy picker**: type to filter,
+  `↑`/`↓` to move, `Enter` to select, `Esc` to cancel. It lists every available model
+  (built-in + your custom ones, below). The current model is marked.
+
 Defaults are in `agent/config.py` (`DEFAULT_PROVIDER`, `DEFAULT_MODEL`).
 
 ## Credentials
@@ -37,50 +43,50 @@ support it. Thinking is streamed and rendered dimmed.
 ## Local & custom models
 
 `pi-ai` reaches local runtimes (Ollama, LM Studio, vLLM, …) and any OpenAI-compatible
-endpoint by treating them as a `Model` with a `baseUrl` and an API flavor (usually
-`openai-completions`) rather than a catalog entry.
+endpoint by treating them as a model with a `baseUrl` and an API flavor (usually
+`openai-completions`) rather than a built-in catalog entry. py-agent makes these selectable
+from the CLI via a small **model registry**: a `models.json` under `.pya/`.
 
-**What `pya` selects today.** The `pya` CLI (and `pya models`) only sees `pi-ai`'s
-*built-in* catalog — `--provider`/`--model` look an id up there. A custom provider you've
-added to your `pi` install's `~/.pi/agent/models.json` is **not** enumerated by `pya
-models` and isn't selectable by id from the CLI yet. Surfacing a model registry in py-agent
-(reading a `models.json` so `--model` can name a local model) is a planned enhancement —
-see `PLAN.md` ("models & providers").
+### Declare a model
 
-**What works now: a full model spec, programmatically.** The underlying
-`PiModelClient.stream` accepts a complete model object instead of a provider/model id, so
-you can point it at a local endpoint directly:
+Create `~/.pya/models.json` (applies everywhere) or `<cwd>/.pya/models.json` (just this
+project; project entries override user ones by `provider/id`). The shape matches pi's own
+`models.json` — a provider block with the connection fields and a list of models:
 
-```python
-import asyncio
-from pi_py_sdk import PiModelClient
-
-LOCAL = {
-    "id": "qwen3", "name": "qwen3", "provider": "local",
-    "api": "openai-completions",
-    "baseUrl": "http://127.0.0.1:8008/v1",
-    "apiKey": "...",               # whatever your server expects
-    "contextWindow": 32768, "maxTokens": 32768,
-    "reasoning": False, "input": ["text"],
+```json
+{
+  "providers": {
+    "local": {
+      "baseUrl": "http://127.0.0.1:8008/v1",
+      "api": "openai-completions",
+      "apiKey": "your-key-or-anything-the-server-wants",
+      "models": [
+        { "id": "qwen3", "name": "Qwen3", "contextWindow": 32768, "maxTokens": 4096 }
+      ]
+    }
+  }
 }
-
-async def main():
-    async with PiModelClient() as client:
-        async for ev in client.stream(
-            model=LOCAL,            # full spec, not an id
-            messages=[{"role": "user", "content": "hello", "timestamp": 0}],
-        ):
-            if ev.type == "text_delta":
-                print(ev.delta, end="", flush=True)
-
-asyncio.run(main())
 ```
 
-py-agent's own `agent/model.py` wrapper currently types `model` as a string, so to drive
-the *agent loop* against a local model today you'd extend `Model`/`open_model` to pass the
-spec through — the seam is already there (`stream` forwards `model` to the client). That
-small registry is the planned work above. A local server's key goes in the spec's
-`apiKey`; built-in providers still resolve via env var or `~/.pi/agent` OAuth as above.
+Only `id` and the provider's `baseUrl`/`api` are really required — `contextWindow`,
+`maxTokens`, `reasoning`, `input`, and `cost` are filled with sensible defaults if omitted.
+
+### Use it
+
+Custom models then behave like any other:
+
+```bash
+pya models                                  # lists built-ins + your custom ones (tagged [custom])
+pya --provider local --model qwen3 -p "hi"  # select by id from the CLI
+```
+
+In the REPL, `/model` (no args) shows them in the fuzzy picker alongside built-ins, or
+`/model local/qwen3` switches directly. The model's `apiKey` is sent as the credential; for
+built-in providers, credentials still resolve via env var or `~/.pi/agent` OAuth as above.
+
+Under the hood the registry flattens each entry into a full pi-ai model object and streams
+it as a `model=` spec (the `PiModelClient.stream` seam accepts an id *or* a full object).
+See `agent/models_registry.py`.
 
 ## Under the hood
 

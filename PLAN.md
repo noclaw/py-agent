@@ -86,9 +86,14 @@ Beyond the seven core phases, these optional features are also built:
 - ✅ **Sub-agents** — a `task` tool spawning a child `run_agent` with its own budget.
   `tools/task.py`.
 - ✅ **`UserPromptSubmit` wiring** — hooks can block/augment a prompt before each turn. `app.py`.
+- ✅ **Model registry + selection** — custom/local models via `.pya/models.json`
+  (`models_registry.py`), selectable by `--model`/`/model` and listed by `pya models`;
+  `/model` with no arg opens a dependency-free fuzzy picker (`picker.py`). `Model`/`open_model`
+  stream a full model spec for local endpoints.
 
-**Tests:** ~115 unit (driven by a scripted fake-model fixture, no network) + a few gated
-live integration tests (`PI_LIVE_LLM=1`).
+**Tests:** ~134 unit (driven by a scripted fake-model fixture, no network; the picker's
+interactive path is exercised through a PTY) + a few gated live integration tests
+(`PI_LIVE_LLM=1`).
 
 ---
 
@@ -106,14 +111,17 @@ files or sqlite). Demonstrates swapping the coding toolset for an assistant tool
 same registry — directly serves goal (b). Good companion to
 [`docs/building-your-own-agent.md`](docs/building-your-own-agent.md).
 
-### 2. Settings file + model registry
+### 2. Settings file (model registry ✅ done)
 
-A real config layer to replace the defaults-and-flags in `config.py`: load/merge a
-`.pya/settings.toml` (project) over `~/.pya/settings.toml` (user) for default model,
-permission mode, retry/compaction tuning, and a `models.json` for custom/local model ids
-(base URL, context window, pricing). Lets `--context-window` and friends be inferred per
-model instead of hard-coded. Port: `packages/coding-agent/src/config.ts`,
-`core/model-registry.ts`.
+The **model registry** half shipped — custom/local models live in `.pya/models.json`,
+are selectable from the CLI and the `/model` picker, and stream as full specs
+(`models_registry.py`, `picker.py`). Port done: `core/model-registry.ts`.
+
+Still open: a real **settings file** to replace the defaults-and-flags in `config.py` —
+load/merge `.pya/settings.toml` (project) over `~/.pya/settings.toml` (user) for default
+model, permission mode, and retry/compaction tuning, and infer `--context-window` per model
+(the registry already carries `contextWindow`) instead of hard-coding it. Port:
+`packages/coding-agent/src/config.ts`.
 
 ### 3. Images / vision
 

@@ -29,6 +29,7 @@ from .compaction import CompactionConfig, Compactor
 from .hooks import HookResult, Hooks, UserPromptSubmit
 from .loop import ContextTransform, run_agent
 from .model import open_model
+from .models_registry import ModelRegistry, load_model_registry, merge_catalog
 from .permissions import PermissionMode, Permissions
 from .render import Renderer, _summarize_args
 from .retry import RetryPolicy
@@ -59,6 +60,20 @@ def _build_tools(model, cwd, permissions, approver, settings: _RunSettings):
             tools, model=model, cwd=cwd, permissions=permissions, approver=approver
         )
     return tools
+
+
+async def _available_models(model, registry_models: ModelRegistry | None):
+    """The model list for the ``/model`` picker: pi-ai's built-in catalog + custom models.
+
+    Fetched once at REPL start. A listing failure (e.g. offline) degrades to just the custom
+    models so the picker still works for local endpoints.
+    """
+    registry_models = registry_models or ModelRegistry()
+    try:
+        builtin = await model.list_models()
+    except Exception:  # noqa: BLE001 — listing is best-effort; never block the REPL
+        builtin = []
+    return merge_catalog(builtin, registry_models)
 
 
 def _make_transform(model, settings: _RunSettings) -> ContextTransform | None:
@@ -204,18 +219,23 @@ def run(
     settings = _RunSettings(
         hooks=hooks, retry=retry, compact=compact, context_window=context_window, subagent=subagent
     )
+    # A custom/local model id (from ~/.pya/models.json) resolves to a full spec to stream.
+    mreg = load_model_registry(cwd)
+    info = mreg.resolve(provider, model)
+    spec = info.spec if info else None
     try:
         if prompt is not None:
             return asyncio.run(
                 _run_once(
-                    prompt, provider=provider, model=model, reasoning=reasoning, cwd=cwd,
+                    prompt, provider=provider, model=model, spec=spec, reasoning=reasoning, cwd=cwd,
                     permissions=permissions, session=session, history=history, settings=settings,
                 )
             )
         return asyncio.run(
             _run_repl(
-                provider=provider, model=model, reasoning=reasoning, cwd=cwd, store=store,
+                provider=provider, model=model, spec=spec, reasoning=reasoning, cwd=cwd, store=store,
                 permissions=permissions, session=session, history=history, settings=settings,
+                registry_models=mreg,
             )
         )
     except KeyboardInterrupt:
@@ -230,6 +250,7 @@ async def _run_once(
     *,
     provider: str,
     model: str,
+    spec: dict | None = None,
     reasoning: str | None,
     cwd: str,
     permissions: Permissions,
@@ -240,7 +261,7 @@ async def _run_once(
     console = Console()
     renderer = Renderer(console)
     approver = _make_approver(console)
-    async with open_model(provider=provider, model=model, reasoning=reasoning) as m:
+    async with open_model(provider=provider, model=model, spec=spec, reasoning=reasoning) as m:
         tools = _build_tools(m, cwd, permissions, approver, settings)
         transform = _make_transform(m, settings)
         system_prompt = build_system_prompt(tools, cwd, skills=discover_skills(cwd))
@@ -263,6 +284,7 @@ async def _run_repl(
     *,
     provider: str,
     model: str,
+    spec: dict | None = None,
     reasoning: str | None,
     cwd: str,
     store: SessionStore | None,
@@ -270,6 +292,7 @@ async def _run_repl(
     session: Session | None,
     history: list[AgentMessage],
     settings: _RunSettings,
+    registry_models: ModelRegistry | None = None,
 ) -> int:
     console = Console()
     skills = discover_skills(cwd)
@@ -277,12 +300,13 @@ async def _run_repl(
     approver = _make_approver(console)
     registry = build_registry(cwd, skills=skills)
 
-    async with open_model(provider=provider, model=model, reasoning=reasoning) as m:
+    async with open_model(provider=provider, model=model, spec=spec, reasoning=reasoning) as m:
         tools = _build_tools(m, cwd, permissions, approver, settings)
         system_prompt = build_system_prompt(tools, cwd, skills=skills)
+        models = await _available_models(m, registry_models)
         ctx = CommandContext(
             console=console, history=history, tools=tools, permissions=permissions, model=m,
-            registry=registry, store=store, session=session, cwd=cwd,
+            registry=registry, store=store, session=session, cwd=cwd, models=models,
         )
         console.print(f"[bold]py-agent[/bold] [dim]({m.name}, cwd={cwd}, perms={permissions.mode.value})[/dim]")
         if history:
