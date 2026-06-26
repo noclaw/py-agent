@@ -23,7 +23,6 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    "pi-py-sdk>=0.2.0",  # transitional: Anthropic transport until Providers Phase 2 (see PROVIDERS.md)
     "pydantic>=2.6,<3",
     "rich>=13",
     "httpx>=0.27",

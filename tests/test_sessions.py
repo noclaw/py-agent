@@ -9,7 +9,7 @@ from agent.types import (
     tool_result_message,
     user_message,
 )
-from pi_py_sdk import AssistantMessage
+from agent.wire import AssistantMessage
 
 
 def _store(tmp_path):

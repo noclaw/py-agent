@@ -22,8 +22,6 @@ from dataclasses import dataclass
 
 from rich.console import Console
 
-from pi_py_sdk import PiError
-
 from .commands import CommandContext, build_registry
 from .compaction import CompactionConfig, Compactor
 from .hooks import HookResult, Hooks, UserPromptSubmit
@@ -31,6 +29,8 @@ from .loop import ContextTransform, run_agent
 from .model import open_model
 from .models_registry import ModelRegistry, load_model_registry, merge_catalog
 from .permissions import PermissionMode, Permissions
+from .providers import ProviderError
+from .providers.catalog import builtin_models
 from .render import Renderer, _summarize_args
 from .retry import RetryPolicy
 from .sessions import Session, SessionStore
@@ -62,18 +62,11 @@ def _build_tools(model, cwd, permissions, approver, settings: _RunSettings):
     return tools
 
 
-async def _available_models(model, registry_models: ModelRegistry | None):
-    """The model list for the ``/model`` picker: pi-ai's built-in catalog + custom models.
-
-    Fetched once at REPL start. A listing failure (e.g. offline) degrades to just the custom
-    models so the picker still works for local endpoints.
-    """
+def _available_models(registry_models: ModelRegistry | None):
+    """The model list for the ``/model`` picker: the curated built-in catalog + custom
+    models from ``.pya/models.json``. No network call — works offline."""
     registry_models = registry_models or ModelRegistry()
-    try:
-        builtin = await model.list_models()
-    except Exception:  # noqa: BLE001 — listing is best-effort; never block the REPL
-        builtin = []
-    return merge_catalog(builtin, registry_models)
+    return merge_catalog(builtin_models(), registry_models)
 
 
 def _make_transform(model, settings: _RunSettings) -> ContextTransform | None:
@@ -240,7 +233,7 @@ def run(
         )
     except KeyboardInterrupt:
         return 130
-    except PiError as exc:
+    except ProviderError as exc:
         Console(stderr=True).print(f"[red][error][/red] {exc}")
         return 1
 
@@ -303,7 +296,7 @@ async def _run_repl(
     async with open_model(provider=provider, model=model, spec=spec, reasoning=reasoning) as m:
         tools = _build_tools(m, cwd, permissions, approver, settings)
         system_prompt = build_system_prompt(tools, cwd, skills=skills)
-        models = await _available_models(m, registry_models)
+        models = _available_models(registry_models)
         ctx = CommandContext(
             console=console, history=history, tools=tools, permissions=permissions, model=m,
             registry=registry, store=store, session=session, cwd=cwd, models=models,

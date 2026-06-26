@@ -33,10 +33,8 @@ tags each prompt with the current git branch.
 
 | var | effect |
 |---|---|
-| `ANTHROPIC_API_KEY` (etc.) | provider credentials (see [models & providers](models-and-providers.md)) |
+| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` (etc.) | provider credentials (see [models & providers](models-and-providers.md)) |
 | `PYA_SESSIONS_DIR` | where sessions are stored (default `~/.pya/sessions`) |
-| `PI_AI_DIR` | path to the `@earendil-works/pi-ai` package, if it can't be found via the `pi` install |
-| `PI_NODE` | path to the `node` executable, if not on `PATH` |
 
 ## The `.pya/` directory
 

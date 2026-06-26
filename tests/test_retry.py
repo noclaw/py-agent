@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import AsyncIterator
 
-from pi_py_sdk import StreamEvent
+from agent.wire import StreamEvent
 
 from agent.loop import run_agent
 from agent.retry import RetryPolicy

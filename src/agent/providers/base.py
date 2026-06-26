@@ -10,10 +10,7 @@ from __future__ import annotations
 
 from typing import Any, AsyncIterator, Protocol
 
-# Phase 1 reuses pi_py_sdk's event/message types so the loop, renderer, sessions, and tests
-# are untouched. Providers Phase 2 swaps these for a native ``agent.wire`` module and removes
-# the pi_py_sdk dependency (see PROVIDERS.md).
-from pi_py_sdk import StreamEvent
+from ..wire import StreamEvent
 
 __all__ = ["Provider"]
 

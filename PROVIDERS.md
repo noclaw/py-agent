@@ -1,20 +1,22 @@
 # PROVIDERS.md — native Python model layer (eliminate `pi_py_sdk`)
 
-Status: **Phase 1 shipped; Phases 2–3 pending.** This document describes replacing the
-delegated model layer (pi-ai via the `pi-py` SDK + Node shim) with a small, native-Python
-provider layer talking directly to provider HTTP APIs.
+Status: **Phases 1 & 2 shipped — `pi_py_sdk` and Node fully removed.** The model layer is
+now native Python (httpx) talking directly to provider HTTP APIs.
 
-**Phase 1 (done):** native OpenAI-compatible backend over httpx (`agent/providers/`),
-routing in `agent/model.py` by the model's `api`. OpenAI-compatible + custom/local models
-(`.pya/models.json`) stream natively — verified against OpenAI and a live local server. The
-pi backend is started **lazily** (only for Anthropic), so OpenAI-only runs spawn no Node.
-Decisions taken: Anthropic OAuth → Phase 2; clean break (remove `pi_py_sdk` when Phase 2
-lands); tiny static catalog (`providers/catalog.py`); forward-only sessions.
+**Phase 1 (done):** native OpenAI-compatible backend (`providers/openai_compat.py`).
+**Phase 2 (done):**
+- `agent/wire.py` — native `StreamEvent`/`AssistantMessage`/`ToolCall`; all imports
+  repointed off `pi_py_sdk`, which is **removed from dependencies** (clean break).
+- `providers/anthropic.py` — native Anthropic Messages backend: streaming, extended
+  thinking with **signature round-trip**, tool use, usage; `providers/oauth.py` reuses a
+  Claude Pro/Max login (`~/.pi/agent/auth.json`) when no `ANTHROPIC_API_KEY` is set.
+- Routing in `model.py` covers both native APIs; `open_model` no longer spawns a subprocess.
+- `pya models` / the `/model` picker list from a curated static catalog
+  (`providers/catalog.py`) + `.pya/models.json` — offline, no Node.
 
-Known Phase-1 limits (resolved by Phase 2): Anthropic still routes through `pi_py_sdk` (Node),
-and `pya models` / the REPL picker still list via pi (so the REPL still starts Node). Native
-types currently reuse `pi_py_sdk`'s `StreamEvent`/`AssistantMessage`; Phase 2 introduces
-`agent/wire.py` and removes the dependency.
+Decisions honored: Anthropic OAuth in Phase 2; clean break; tiny static catalog;
+forward-only sessions. Deliberately out of scope (custom-code escape hatch via the
+`Provider` protocol): Bedrock/Vertex/Azure and the OpenAI Responses API.
 
 ## Goal & scope
 

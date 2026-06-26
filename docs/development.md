@@ -4,7 +4,7 @@
 
 ```
 src/agent/        the package (see architecture.md for the module map)
-tests/            pytest; unit tests need no Node (a scripted fake model stands in)
+tests/            pytest; no network (a scripted fake model + httpx.MockTransport stand in)
 docs/             these docs
 PLAN.md           status + remaining optional phases
 ```
@@ -15,23 +15,16 @@ PLAN.md           status + remaining optional phases
 uv sync --extra dev
 ```
 
-This pulls `pi-py-sdk` from PyPI, so the repo is self-contained. To develop against a
-local `pi-py` checkout (e.g. to change the model shim), add to `pyproject.toml`:
-
-```toml
-[tool.uv.sources]
-pi-py-sdk = { path = "../pi-py", editable = true }
-```
-
-then `uv sync` again. (Reminder: virtualenvs aren't relocatable — if you move/rename the
-repo directory, `rm -rf .venv && uv sync` to rebuild it.)
+Pure-Python dependencies (`httpx`, `pydantic`, `rich`) — the repo is self-contained, no
+Node. (Reminder: virtualenvs aren't relocatable — if you move/rename the repo directory,
+`rm -rf .venv && uv sync` to rebuild it.)
 
 ## Tests
 
 ```bash
-uv run pytest                         # unit tests (no Node, no network)
-uv run pytest -m integration          # live tests (need Node + pi-ai)
-PI_LIVE_LLM=1 uv run pytest -m integration   # also the tests that call a model
+uv run pytest                         # unit tests (no network; providers use httpx.MockTransport)
+uv run pytest -m integration          # live tests, gated (need a real key)
+PYA_LIVE_LLM=1 ANTHROPIC_API_KEY=… uv run pytest -m integration   # tests that call a model
 ```
 
 Integration tests are skipped unless `pi`/`node` are present, and the ones that call a
@@ -56,5 +49,5 @@ it over live tests for logic; keep live tests few and high-signal.
 
 ## Releasing
 
-py-agent isn't published to PyPI. The model SDK it depends on, `pi-py-sdk`, is — see that
-repo for its release flow (a GitHub Release triggers a Trusted-Publishing workflow).
+py-agent isn't published to PyPI; install it from the repo (`uv tool install .`). It has no
+non-PyPI dependencies — just `httpx`, `pydantic`, and `rich`.

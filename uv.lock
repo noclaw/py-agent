@@ -128,18 +128,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pi-py-sdk"
-version = "0.2.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "pydantic" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/29/0a/20a901e4b7121086b337264ea5e02aaa046ccbf8dd981b4018706cedde49/pi_py_sdk-0.2.1.tar.gz", hash = "sha256:2e0c7af6b13b3a6146f199f8804cca330eb97e9a9b61e658024126f19d9e4e17", size = 49873, upload-time = "2026-06-25T23:55:54.027Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/96/2f/af52f872f91a64168759e96fe9b9800ac3c0e666138ba7fa01d4ecd05f7a/pi_py_sdk-0.2.1-py3-none-any.whl", hash = "sha256:9ead46b83d0f0ce4ece7b26badf103a921844305c154b7b062d0b6d2855bdebc", size = 38301, upload-time = "2026-06-25T23:55:52.729Z" },
-]
-
-[[package]]
 name = "pluggy"
 version = "1.6.0"
 source = { registry = "https://pypi.org/simple" }
@@ -154,7 +142,6 @@ version = "0.0.1"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },
-    { name = "pi-py-sdk" },
     { name = "pydantic" },
     { name = "rich" },
 ]
@@ -168,7 +155,6 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
-    { name = "pi-py-sdk", specifier = ">=0.2.0" },
     { name = "pydantic", specifier = ">=2.6,<3" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23" },

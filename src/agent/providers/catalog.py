@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-__all__ = ["Route", "route_for", "model_meta", "KNOWN_PROVIDERS"]
+__all__ = ["Route", "route_for", "model_meta", "builtin_models", "KNOWN_PROVIDERS", "BUILTIN_MODELS"]
 
 
 @dataclass(frozen=True)
@@ -39,11 +39,37 @@ KNOWN_PROVIDERS: dict[str, Route] = {
 #: Minimal per-model metadata (context windows) for models we ship knowledge of. Optional —
 #: used to size compaction when a model is known. Custom models carry their own in the spec.
 MODEL_META: dict[str, dict[str, int]] = {
+    "claude-opus-4-8": {"contextWindow": 1_000_000},
+    "claude-opus-4-7": {"contextWindow": 1_000_000},
+    "claude-sonnet-4-6": {"contextWindow": 1_000_000},
+    "claude-haiku-4-5": {"contextWindow": 200_000},
+    "claude-fable-5": {"contextWindow": 1_000_000},
     "gpt-5.1": {"contextWindow": 400_000},
     "gpt-5": {"contextWindow": 400_000},
     "gpt-4.1": {"contextWindow": 1_047_576},
     "gpt-4o": {"contextWindow": 128_000},
 }
+
+#: A small curated catalog of well-known models, shown by ``pya models`` and the ``/model``
+#: picker without a network call. Selecting any other id still works (routing is by provider).
+#: Local/custom models come from ``.pya/models.json`` (see :mod:`agent.models_registry`).
+BUILTIN_MODELS: list[dict[str, str]] = [
+    {"provider": "anthropic", "id": "claude-opus-4-8"},
+    {"provider": "anthropic", "id": "claude-opus-4-7"},
+    {"provider": "anthropic", "id": "claude-sonnet-4-6"},
+    {"provider": "anthropic", "id": "claude-haiku-4-5"},
+    {"provider": "anthropic", "id": "claude-fable-5"},
+    {"provider": "openai", "id": "gpt-5.1"},
+    {"provider": "openai", "id": "gpt-5"},
+    {"provider": "openai", "id": "gpt-5-codex"},
+    {"provider": "openai", "id": "gpt-4.1"},
+    {"provider": "openai", "id": "gpt-4o"},
+]
+
+
+def builtin_models() -> list[dict[str, str]]:
+    """The curated built-in model list (provider/id dicts) for listing & the picker."""
+    return list(BUILTIN_MODELS)
 
 
 def route_for(provider: str | None, model_id: str) -> Route | None:

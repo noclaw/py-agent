@@ -5,17 +5,12 @@ For the full tour see the [README](README.md); for depth see [`docs/`](docs/READ
 
 ## 1. Prerequisites
 
-- **Python ≥ 3.11** and [`uv`](https://docs.astral.sh/uv/) (recommended) — or pip.
-- **Node** on your `PATH` plus a local `pi` install, which bundles the `pi-ai` model
-  runtime the agent talks to:
-  ```bash
-  npm i -g @earendil-works/pi-coding-agent
-  ```
+- **Python ≥ 3.11** and [`uv`](https://docs.astral.sh/uv/) (recommended) — or pip. No Node.
 - **Credentials** — either of:
   - a provider API key in your environment (e.g. `export ANTHROPIC_API_KEY=...` or
     `export OPENAI_API_KEY=...`), **or**
-  - an existing Pi OAuth login: run `pi`, then `/login` (py-agent reuses the token from
-    `~/.pi/agent/auth.json`).
+  - for Claude Pro/Max, an OAuth login at `~/.pi/agent/auth.json` (run `pi`, then `/login`
+    once — that's the only thing that needs Node, and only for the login, not at runtime).
 
 ## 2. Install
 
@@ -54,7 +49,7 @@ interrupts the current turn; Ctrl-D quits.
 
 ## 4. Pick a provider and model
 
-`pya` selects from the catalog `pi-ai` knows about — `pya models` lists it (30+ providers).
+`pya` lists a curated built-in catalog (Anthropic + OpenAI) plus your custom models — run `pya models`.
 Set credentials for the provider you want, then choose it:
 
 ```bash
@@ -92,8 +87,9 @@ credential resolution order and local/self-hosted models, see
 | symptom | fix |
 |---|---|
 | `pya: command not found` after `uv tool install` | `~/.local/bin` isn't on `PATH` — run `uv tool update-shell`, then restart the shell. |
-| `models` hangs or "no models" / a Node error | Node isn't on `PATH`, or `pi`/`pi-ai` isn't installed. Re-run the `npm i -g …` step; check `node --version` and `pi --version`. Point at a specific pi-ai with `PI_AI_DIR=...` if needed. |
-| auth / 401 errors mid-turn | The provider key isn't set (or the OAuth login expired). Set the env var, or re-run `pi` → `/login`. |
+| `models` shows nothing useful | Set a provider key (`ANTHROPIC_API_KEY`/`OPENAI_API_KEY`) and pick that provider; add local models in `~/.pya/models.json`. |
+| auth / 401 errors mid-turn | The provider key isn't set (or the Pro/Max OAuth login expired). Set the env var, or re-run `pi` → `/login`. |
+| `rate_limit_error` (429) | Provider-side rate/usage limit — wait and retry, or use a different key/model. |
 | wrong directory | `pya --cwd /path/to/project` sets where the agent reads/writes files. |
 
 ## Next

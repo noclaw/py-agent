@@ -6,20 +6,17 @@ for everyday use.
 
 ## Requirements
 
-- Python ≥ 3.11 and [`uv`](https://docs.astral.sh/uv/) (or pip).
-- **Node** on `PATH` and a local `pi` install — it bundles `pi-ai`, which the model shim
-  imports:
-  ```bash
-  npm i -g @earendil-works/pi-coding-agent
-  ```
+- Python ≥ 3.11 and [`uv`](https://docs.astral.sh/uv/) (or pip). No Node required.
 - Credentials (either one):
-  - a provider API key in the environment, e.g. `export ANTHROPIC_API_KEY=...`, or
-  - an existing Pi OAuth login — run `pi`, then `/login`. py-agent reads/refreshes the
-    token from `~/.pi/agent/auth.json` automatically.
+  - a provider API key in the environment, e.g. `export ANTHROPIC_API_KEY=...` /
+    `export OPENAI_API_KEY=...`, or
+  - for Claude Pro/Max, an OAuth login at `~/.pi/agent/auth.json` (run `pi`, then `/login`
+    once — Node is only needed for that login step). py-agent reads/refreshes the token
+    automatically.
 
-The model layer (providers, auth, transports, local models) is delegated to `pi-ai`
-through the [`pi-py`](https://github.com/noclaw/pi-py) SDK — py-agent never talks to a
-provider's HTTP API directly. See [models & providers](models-and-providers.md) and
+The model layer is native Python (httpx) talking directly to provider HTTP APIs —
+OpenAI-compatible (OpenAI + local servers) and Anthropic. See
+[models & providers](models-and-providers.md) and
 [architecture](architecture.md).
 
 ## Install
@@ -52,12 +49,11 @@ The rest of these docs write `pya`; under the developer flow, prefix with `uv ru
 
 ## Configure a provider
 
-Credentials are resolved by `pi-ai`/the shim, not by py-agent — there's nothing to put in
-a config file. The resolution order is:
+Credentials resolve in this order (per provider):
 
-1. an explicit key passed in code (rarely needed),
-2. the provider's **environment variable**, or
-3. an existing Pi **OAuth login** in `~/.pi/agent/auth.json`.
+1. an explicit key in a `.pya/models.json` model spec (custom/local models),
+2. the provider's **environment variable** (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, …),
+3. for Anthropic only: a Claude **Pro/Max OAuth login** in `~/.pi/agent/auth.json`.
 
 So pick whichever fits:
 
@@ -68,17 +64,17 @@ export ANTHROPIC_API_KEY=sk-ant-...
 # OpenAI
 export OPENAI_API_KEY=sk-...
 
-# …or reuse a Pi login (no env var needed)
-pi          # then type /login once; py-agent refreshes the token automatically
+# …or, for Claude Pro/Max, reuse an OAuth login (no env var needed)
+pi          # then type /login once; py-agent reads/refreshes the token automatically
 ```
 
-Other providers follow the same pattern (`GEMINI_API_KEY`, `GROQ_API_KEY`, …). `pya
-models` lists every provider `pi-ai` knows about.
+OpenAI-compatible providers (`groq`, `together`, `openrouter`, …) follow the same
+env-var pattern. `pya models` lists the curated built-ins plus your custom models.
 
 ## Select a model
 
 ```bash
-pya models                              # list everything pi-ai knows about
+pya models                              # curated built-ins + custom (.pya/models.json)
 pya models --provider anthropic         # filter to one provider
 pya --provider anthropic --model claude-sonnet-4-6 -p "hello"
 pya --provider openai    --model gpt-5.1            -p "hello"
@@ -119,13 +115,12 @@ pya --yolo            # skip approval prompts (allow everything)
 
 - **`pya: command not found`** after `uv tool install` — `~/.local/bin` isn't on `PATH`.
   Run `uv tool update-shell` and restart the shell (or use the `uv run pya` flow).
-- **`models` hangs, returns nothing, or a Node error** — Node isn't on `PATH`, or
-  `pi`/`pi-ai` isn't installed. Check `node --version` and `pi --version`; re-run
-  `npm i -g @earendil-works/pi-coding-agent`. If pi-ai lives somewhere unusual, set
-  `PI_AI_DIR=/path/to/@earendil-works/pi-ai`; if Node isn't `node` on `PATH`, set
-  `PI_NODE`.
-- **Auth / 401 errors mid-turn** — the provider key isn't set, or an OAuth token expired.
-  Set the env var, or re-run `pi` → `/login`.
+- **Auth / 401 errors mid-turn** — the provider key isn't set, or a Pro/Max OAuth token
+  expired. Set the env var, or re-run `pi` → `/login`.
+- **`rate_limit_error` (429)** — a provider-side rate/usage cap. Wait and retry, or switch
+  to a different key/model.
+- **Unknown provider** — only `anthropic`/`openai`(-compatible) are built in; add others to
+  `~/.pya/models.json` with their `baseUrl`/`api`.
 - **The agent edits the wrong files** — pass `--cwd` to point it at the right project.
 
 ## What to read next

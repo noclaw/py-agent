@@ -88,12 +88,15 @@ Beyond the seven core phases, these optional features are also built:
 - ✅ **`UserPromptSubmit` wiring** — hooks can block/augment a prompt before each turn. `app.py`.
 - ✅ **Model registry + selection** — custom/local models via `.pya/models.json`
   (`models_registry.py`), selectable by `--model`/`/model` and listed by `pya models`;
-  `/model` with no arg opens a dependency-free fuzzy picker (`picker.py`). `Model`/`open_model`
-  stream a full model spec for local endpoints.
+  `/model` with no arg opens a dependency-free fuzzy picker (`picker.py`).
+- ✅ **Native provider layer** (`PROVIDERS.md`, Phases 1–2) — model calls go directly to
+  provider HTTP APIs over httpx (`agent/providers/`: `openai-completions` + `anthropic-messages`,
+  with Claude Pro/Max OAuth); `wire.py` holds the native types; **`pi_py_sdk` and Node are
+  removed**. Exotic transports (Bedrock/Vertex/Azure) are out of scope — add a `Provider`.
 
-**Tests:** ~134 unit (driven by a scripted fake-model fixture, no network; the picker's
-interactive path is exercised through a PTY) + a few gated live integration tests
-(`PI_LIVE_LLM=1`).
+**Tests:** ~149 unit (scripted fake-model fixture + `httpx.MockTransport`, no network; the
+picker's interactive path runs through a PTY) + a few gated live integration tests
+(`PYA_LIVE_LLM=1` + `ANTHROPIC_API_KEY`).
 
 ---
 

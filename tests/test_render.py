@@ -16,7 +16,7 @@ from agent.types import (
     ToolResult,
     ToolStart,
 )
-from pi_py_sdk import AssistantMessage, StreamEvent
+from agent.wire import AssistantMessage, StreamEvent
 
 
 def _renderer():

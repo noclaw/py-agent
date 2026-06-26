@@ -24,9 +24,10 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, ClassVar, Union
 
-from pi_py_sdk import AssistantMessage as LlmAssistantMessage
-from pi_py_sdk import StreamEvent
 from pydantic import BaseModel
+
+from .wire import AssistantMessage as LlmAssistantMessage
+from .wire import StreamEvent
 
 __all__ = [
     "now_ms",

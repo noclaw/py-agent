@@ -1,9 +1,9 @@
 # py-agent
 
-A readable Python port of the [Pi](https://pi.dev) coding agent. The **agent loop and
-tools are written in Python** here; the **model layer** (30+ providers, OAuth, transports,
-local models) is delegated to Pi's `pi-ai` through the
-[`pi-py`](https://github.com/noclaw/pi-py) SDK's `PiModelClient`.
+A readable Python coding agent (originally ported from [Pi](https://pi.dev)). **All of it
+is Python** — the agent loop, the tools, and the model layer, which talks directly to
+provider HTTP APIs over `httpx`. No Node, no subprocess. It supports OpenAI-compatible
+endpoints (OpenAI + local servers: Ollama, LM Studio, vLLM, …) and Anthropic.
 
 It's meant as an example implementation — small enough to read while learning Python, and
 a clean starting point for personal-assistant / second-brain agents (swap the coding
@@ -12,8 +12,9 @@ toolset for your own).
 > **Status:** working end to end — the full tool set (read/write/edit/bash/grep/find/ls),
 > the agent loop, system prompt, interactive CLI/REPL, **permissions**, **hooks**, **slash
 > commands** with custom markdown commands, **skills**, **session** save/resume,
-> **compaction**, **auto-retry**, and **sub-agents** (a `task` tool) — all modeled on Claude
-> Code. Next: memory / second-brain tools. See [`PLAN.md`](PLAN.md).
+> **compaction**, **auto-retry**, **sub-agents** (a `task` tool), a **model picker**, and a
+> **native provider layer** (OpenAI-compatible + Anthropic, no Node — see
+> [`PROVIDERS.md`](PROVIDERS.md)). Next: memory / second-brain tools. See [`PLAN.md`](PLAN.md).
 
 ## Architecture
 
@@ -24,15 +25,17 @@ toolset for your own).
 │    │                                                                │
 │    │ per turn: stream(context{system, messages, tools})            │
 │    ▼                                                                │
-│  pi_py_sdk.PiModelClient  ──JSONL──┐                                │
-└─────────────────────────────────────┼──────────────────────────────┘
-                                       ▼
-              Node shim  ──imports──>  @earendil-works/pi-ai
-              (providers, auth, transports, local models)
+│  model ──routes by api──>  providers/                              │
+│        openai_compat (OpenAI + local)   anthropic (Claude)         │
+│              │                               │                      │
+│              └────────── httpx ──────────────┘                      │
+└─────────────────────────────────┼───────────────────────────────────┘
+                                   ▼
+                    provider HTTP APIs (SSE streaming)
 ```
 
-Only the LLM call crosses into Node; the loop and tools stay in readable Python. See
-`PLAN.md` for the pi-agent-core vs pi-coding-agent module map this port follows.
+Everything is in-process Python; the only thing that leaves is the HTTPS call to the
+provider. To support a transport we don't ship, implement the small `Provider` protocol.
 
 > **In a hurry?** The [QUICKSTART](QUICKSTART.md) gets you from zero to a first turn —
 > install, credentials, pick a model. This README is the fuller tour.
@@ -41,12 +44,11 @@ Only the LLM call crosses into Node; the loop and tools stay in readable Python.
 
 - Python ≥ 3.11
 - [`uv`](https://docs.astral.sh/uv/) (recommended) or pip
-- **Node** on `PATH` and a local `pi` install (provides the bundled `pi-ai`):
-  ```bash
-  npm i -g @earendil-works/pi-coding-agent
-  ```
-- Credentials: a provider env var (e.g. `ANTHROPIC_API_KEY`) **or** an existing Pi OAuth
-  login (`pi`, then `/login`).
+- Credentials: a provider env var (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, …) **or**, for
+  Claude Pro/Max, an existing OAuth login at `~/.pi/agent/auth.json` (run `pi`, then
+  `/login` once — `pi`/Node are only needed for that login, not at runtime).
+
+No Node and no `pi` install are required to run the agent.
 
 ## Setup
 
@@ -54,11 +56,8 @@ Only the LLM call crosses into Node; the loop and tools stay in readable Python.
 uv sync --extra dev
 ```
 
-This pulls `pi-py-sdk` from PyPI, so the repo is self-contained. (To develop against a
-local pi-py checkout instead, add `[tool.uv.sources]` → `pi-py-sdk = { path = "../pi-py",
-editable = true }` to `pyproject.toml`.)
-
-To run `pya` from anywhere (not just `uv run` inside the repo), install the CLI:
+Pure-Python dependencies (`httpx`, `pydantic`, `rich`). To run `pya` from anywhere (not
+just `uv run` inside the repo), install the CLI:
 
 ```bash
 uv tool install .       # or: pipx install .

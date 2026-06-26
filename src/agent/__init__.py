@@ -1,8 +1,8 @@
 """py-agent: a readable Python coding agent.
 
-The agent **loop and tools are written in Python** (this package); the **model layer**
-— providers, auth, transports, local models — is delegated to Pi's ``pi-ai`` through the
-``pi-py`` SDK's :class:`~pi_py_sdk.model.PiModelClient`.
+**All of it is Python** (this package): the agent loop, the tools, and the model layer
+(:mod:`agent.providers`), which talks directly to provider HTTP APIs over ``httpx`` —
+OpenAI-compatible (OpenAI + local servers) and Anthropic. No Node, no subprocess.
 
 It is meant as an example implementation: small enough to read while learning Python,
 and a clean starting point for personal-assistant / second-brain agents (swap the

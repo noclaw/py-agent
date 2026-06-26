@@ -70,7 +70,7 @@ def _ctx(cwd, skills):
     buffer = io.StringIO()
     console = Console(file=buffer, force_terminal=False, width=200)
     registry = build_registry(cwd, skills=skills)
-    model = Model(None, provider="anthropic", model="claude-sonnet-4-6")  # type: ignore[arg-type]
+    model = Model(provider="anthropic", model="claude-sonnet-4-6")
     ctx = CommandContext(
         console=console, history=[], tools=coding_tools(cwd), permissions=Permissions(),
         model=model, registry=registry, cwd=str(cwd),

@@ -1,30 +1,28 @@
-"""Opt-in live test: the message types survive a real tool round-trip.
+"""Opt-in live test: the message types survive a real tool round-trip (native provider).
 
-This is the key validation for the loop (Phase 5): a streamed assistant message replayed
-verbatim, plus a tool-result message, must produce a correct continuation.
+A streamed assistant message replayed verbatim, plus a tool-result message, must produce a
+correct continuation.
 
-Run with:  PI_LIVE_LLM=1 pytest -m integration
+Run with:  PYA_LIVE_LLM=1 pytest -m integration
 """
 
 from __future__ import annotations
 
 import os
-import shutil
 
 import pytest
 
+from agent.model import open_model
 from agent.types import to_llm_messages, tool_result_message, user_message
-from pi_py_sdk import PiModelClient
 
 pytestmark = [
     pytest.mark.integration,
-    pytest.mark.skipif(shutil.which("pi") is None, reason="`pi` not on PATH"),
-    pytest.mark.skipif(shutil.which("node") is None, reason="`node` not on PATH"),
-    pytest.mark.skipif(os.environ.get("PI_LIVE_LLM") != "1", reason="set PI_LIVE_LLM=1"),
+    pytest.mark.skipif(os.environ.get("PYA_LIVE_LLM") != "1", reason="set PYA_LIVE_LLM=1"),
+    pytest.mark.skipif(not os.environ.get("ANTHROPIC_API_KEY"), reason="ANTHROPIC_API_KEY not set"),
 ]
 
-_MODEL = os.environ.get("PI_LIVE_MODEL", "claude-haiku-4-5")
-_PROVIDER = os.environ.get("PI_LIVE_PROVIDER", "anthropic")
+_MODEL = os.environ.get("PYA_LIVE_MODEL", "claude-haiku-4-5")
+_PROVIDER = os.environ.get("PYA_LIVE_PROVIDER", "anthropic")
 
 _CALC = {
     "name": "calculator",
@@ -38,22 +36,22 @@ _CALC = {
 
 
 def _blocks(message, kind):
-    out = []
-    for block in message.content:
-        btype = block.get("type") if isinstance(block, dict) else getattr(block, "type", None)
-        if btype == kind:
-            out.append(block)
-    return out
+    return [b for b in message.content if isinstance(b, dict) and b.get("type") == kind]
+
+
+async def _turn(model, history):
+    final = None
+    async for ev in model.stream(messages=to_llm_messages(history), tools=[_CALC]):
+        if ev.is_terminal:
+            final = ev.final_message
+    return final
 
 
 @pytest.mark.asyncio
 async def test_tool_round_trip():
     history = [user_message("What is 17 * 23? Use the calculator tool, then state the number.")]
-    async with PiModelClient() as client:
-        first = await client.complete(
-            provider=_PROVIDER, model=_MODEL, messages=to_llm_messages(history),
-            tools=[_CALC], maxTokens=512,
-        )
+    async with open_model(provider=_PROVIDER, model=_MODEL) as model:
+        first = await _turn(model, history)
         history.append(first)
         calls = _blocks(first, "toolCall")
         assert first.stopReason == "toolUse"
@@ -63,9 +61,6 @@ async def test_tool_round_trip():
             product = call["arguments"]["a"] * call["arguments"]["b"]
             history.append(tool_result_message(call["id"], call["name"], str(product)))
 
-        second = await client.complete(
-            provider=_PROVIDER, model=_MODEL, messages=to_llm_messages(history),
-            tools=[_CALC], maxTokens=512,
-        )
+        second = await _turn(model, history)
         text = "".join(b.get("text", "") for b in _blocks(second, "text"))
         assert "391" in text

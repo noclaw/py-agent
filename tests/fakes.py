@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any, AsyncIterator
 
-from pi_py_sdk import AssistantMessage, StreamEvent
+from agent.wire import AssistantMessage, StreamEvent
 
 
 def text_turn(text: str) -> list[StreamEvent]:
@@ -27,7 +27,7 @@ def tool_turn(calls: list[tuple[str, str, dict[str, Any]]]) -> list[StreamEvent]
 
     ``calls`` is a list of ``(id, name, arguments)`` tuples.
     """
-    from pi_py_sdk import ToolCall
+    from agent.wire import ToolCall
 
     content = [{"type": "toolCall", "id": i, "name": n, "arguments": a} for i, n, a in calls]
     message = AssistantMessage(role="assistant", content=content, stopReason="toolUse")

@@ -1,15 +1,16 @@
 # Models & providers
 
-The model layer is delegated to Pi's `pi-ai` through the `pi-py` SDK — py-agent never talks
-to a provider's HTTP API directly. This is what lets one small codebase support 30+
-providers, OAuth, multiple transports, and local models. See
-[architecture](architecture.md) for the shim.
+The model layer is native Python (`agent/providers/`) talking directly to provider HTTP APIs
+over `httpx` — no Node, no SDK. Two backends ship: **`openai-completions`** (OpenAI and any
+OpenAI-compatible server — Ollama, LM Studio, vLLM, Groq, Together, OpenRouter, …) and
+**`anthropic-messages`** (Claude). To support another transport, implement the `Provider`
+protocol. See [architecture](architecture.md) and [`PROVIDERS.md`](../PROVIDERS.md).
 
 ## Choosing a model
 
 ```bash
-uv run pya --provider anthropic --model claude-sonnet-4-6
-uv run pya models                       # list everything pi-ai knows about
+uv run pya --provider anthropic --model claude-opus-4-8
+uv run pya models                       # curated built-ins + your custom models
 uv run pya models --provider anthropic  # filter to one provider
 ```
 
@@ -24,16 +25,17 @@ Defaults are in `agent/config.py` (`DEFAULT_PROVIDER`, `DEFAULT_MODEL`).
 
 ## Credentials
 
-`pi-ai`/the shim resolve credentials in this order — there's nothing to implement in
-Python beyond optionally passing a key:
+Resolution order (per provider):
 
-1. an explicit key (rarely needed),
-2. the provider's environment variable (e.g. `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
-   `GEMINI_API_KEY`, …),
-3. an existing Pi **OAuth login** in `~/.pi/agent/auth.json` (e.g. Claude Pro/Max via
-   `pi` → `/login`). The shim reads and refreshes the token automatically.
+1. an explicit key in a custom model's `.pya/models.json` spec (`apiKey`),
+2. the provider's environment variable (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
+   `GROQ_API_KEY`, …),
+3. for Anthropic only: a Claude **Pro/Max OAuth login** in `~/.pi/agent/auth.json` (via
+   `pi` → `/login`). `agent/providers/oauth.py` reads it and refreshes the token
+   automatically — the bearer token is sent with the `anthropic-beta: oauth-2025-04-20`
+   header.
 
-So if you already use `pi`, py-agent works with no extra setup.
+So if you already logged into Claude Pro/Max with `pi`, Anthropic works with no env var.
 
 ## Reasoning / thinking
 

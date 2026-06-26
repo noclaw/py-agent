@@ -1,15 +1,16 @@
-"""Native Python provider layer (Providers Phase 1).
+"""Native Python provider layer.
 
-Talks directly to provider HTTP APIs over httpx — no Node, no shim. Phase 1 ships the
-OpenAI-compatible backend (`openai-completions`), which covers OpenAI and most local /
-OpenAI-compatible servers. Anthropic (`anthropic-messages`) is Phase 2; until then it routes
-to the transitional pi backend (see ``PROVIDERS.md``).
+Talks directly to provider HTTP APIs over httpx — no Node, no shim, no SDK. Ships two
+backends: ``openai-completions`` (OpenAI + most local / OpenAI-compatible servers) and
+``anthropic-messages`` (Claude). Custom transports plug in via the :class:`Provider`
+protocol and a ``.pya/models.json`` entry. See ``PROVIDERS.md``.
 """
 
 from __future__ import annotations
 
+from .anthropic import AnthropicProvider
 from .base import Provider
-from .catalog import Route, model_meta, route_for
+from .catalog import Route, builtin_models, model_meta, route_for
 from .errors import ProviderError
 from .openai_compat import OpenAICompatProvider
 
@@ -17,11 +18,13 @@ __all__ = [
     "Provider",
     "ProviderError",
     "OpenAICompatProvider",
+    "AnthropicProvider",
     "Route",
     "route_for",
     "model_meta",
+    "builtin_models",
     "NATIVE_APIS",
 ]
 
-#: API flavors the native layer implements today. Others fall back to the pi backend.
-NATIVE_APIS = frozenset({"openai-completions"})
+#: API flavors the native layer implements. Others must be added via a custom Provider.
+NATIVE_APIS = frozenset({"openai-completions", "anthropic-messages"})

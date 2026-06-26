@@ -1,4 +1,4 @@
-"""Phase 1 scaffold checks: the package imports, the CLI parses, pi-py is reachable."""
+"""Scaffold checks: the package imports, the CLI parses, the provider layer is present."""
 
 from __future__ import annotations
 
@@ -13,9 +13,9 @@ def test_version_is_exposed():
     assert agent.__version__
 
 
-def test_pi_py_is_importable():
-    # The model bridge this project is built on must be installed.
-    from pi_py_sdk import PiModelClient  # noqa: F401
+def test_provider_layer_is_importable():
+    # The native provider layer (httpx, no Node/SDK) backs the model calls.
+    from agent.providers import AnthropicProvider, OpenAICompatProvider  # noqa: F401
 
 
 def test_cli_parser_defaults():

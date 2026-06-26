@@ -14,7 +14,7 @@ from agent.types import (
     tools_to_wire,
     user_message,
 )
-from pi_py_sdk import AssistantMessage, StreamEvent
+from agent.wire import AssistantMessage, StreamEvent
 
 
 def test_user_message_to_wire():

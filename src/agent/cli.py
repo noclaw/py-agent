@@ -115,27 +115,16 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _cmd_models(provider: str | None, cwd: str) -> int:
-    """List available models: pi-ai's built-in catalog plus any custom/local models from
-    ``~/.pya/models.json`` / ``<cwd>/.pya/models.json``.
-
-    Needs Node + a local ``pi`` install (for the bundled pi-ai).
-    """
-    from pi_py_sdk import PiError, PiModelClientSync
-
+    """List available models: the curated built-in catalog plus any custom/local models
+    from ``~/.pya/models.json`` / ``<cwd>/.pya/models.json``. No network call."""
     from .models_registry import load_model_registry, merge_catalog
+    from .providers.catalog import builtin_models
 
-    try:
-        with PiModelClientSync() as client:
-            builtin = client.list_models(provider)
-    except PiError as exc:
-        print(f"[error] {exc}", file=sys.stderr)
-        return 1
-
-    models = merge_catalog(builtin, load_model_registry(cwd))
+    models = merge_catalog(builtin_models(), load_model_registry(cwd))
     if provider is not None:
         models = [m for m in models if m.provider == provider]
     if not models:
-        print("(no models — check your `pi` install / provider config)", file=sys.stderr)
+        print("(no models)", file=sys.stderr)
         return 1
     for m in models:
         tag = "  [custom]" if m.is_custom else ""

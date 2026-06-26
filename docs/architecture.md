@@ -1,24 +1,23 @@
 # Architecture
 
-py-agent splits cleanly along the same lines as [Pi](https://pi.dev), which ships as three
-layered npm packages:
+py-agent began as a port of [Pi](https://pi.dev) and keeps Pi's layering, but every layer
+is now Python:
 
-| Layer | Pi package | py-agent |
+| Layer | Origin | py-agent |
 |---|---|---|
-| Model / provider / streaming / auth | `@earendil-works/pi-ai` | **reused** as a black box |
+| Model / provider / streaming / auth | `@earendil-works/pi-ai` (TypeScript) | **native Python** (`agent/providers/`, httpx) |
 | Generic agent loop + harness | `@earendil-works/pi-agent-core` | **ported to Python** |
 | Coding product (tools, prompt, sessions, commands) | `@earendil-works/pi-coding-agent` | **ported to Python** |
 
-The bet: the model layer (30+ providers, OAuth, transports, local models) is large,
-well-tested, and not interesting to reimplement — so we keep it. The loop and tools are
-the parts worth reading and customizing, so those are plain Python here.
+Originally the model layer was delegated out-of-process to `pi-ai` via a Node shim. That
+dependency was removed (Providers Phases 1–2, see [`PROVIDERS.md`](../PROVIDERS.md)) in favor
+of a small native layer — at the cost of breadth (we ship OpenAI-compatible + Anthropic;
+exotic transports are user custom code) but with no Node and full control of local models.
 
-## The Node shim
+## The model layer
 
-There is no Pi mode that streams *raw model output* without running the whole agent. So
-the `pi-py` SDK gained a small Node script (`pi_py_sdk/_shim/stream.mjs`) that imports
-`pi-ai` and exposes its `streamSimple` over JSONL on stdin/stdout. The Python side talks
-to it through `pi_py_sdk.PiModelClient`.
+`model.py` routes a turn to a native provider by the model's API flavor; each provider
+turns its HTTP/SSE stream into the `StreamEvent`s the loop consumes (`wire.py`).
 
 ```
 ┌─────────────────────────── Python (py-agent) ────────────────────────────┐
@@ -27,15 +26,15 @@ to it through `pi_py_sdk.PiModelClient`.
 │    │        each tool call gated by:  hooks → permissions → approval      │
 │    │ per turn: stream(context = system prompt + messages + tools)         │
 │    ▼                                                                      │
-│  pi_py_sdk.PiModelClient  ──JSONL over a subprocess──┐                    │
-└───────────────────────────────────────────────────────┼──────────────────┘
-                                                         ▼
-              Node shim (stream.mjs)  ──imports──>  @earendil-works/pi-ai
-              (providers, auth, transports, local models)
+│  model.py ──by api──> providers/ ──┐                                      │
+│     openai_compat  ·  anthropic    │                                      │
+└──────────────────────────────────────┼───────────────────────────────────┘
+                                        ▼  httpx (SSE)
+                          provider HTTP APIs (OpenAI-compatible / Anthropic)
 ```
 
-Only the LLM call crosses into Node. Everything else — turn structure, tool execution,
-permissions, sessions, the prompt — is Python you can read in `src/agent/`.
+Everything is in-process Python; only the HTTPS call leaves. To stream a transport we don't
+ship, implement the `Provider` protocol (`providers/base.py`).
 
 ## A turn's lifecycle
 
@@ -64,7 +63,9 @@ src/agent/
   cli.py            argument parsing → app.run
   app.py            REPL + one-shot; builds Permissions, approver, registry, sessions
   loop.py           run_agent — the heart (turns, gating, tool execution, events)
-  model.py          Model adapter over pi_py_sdk.PiModelClient; open_model()
+  model.py          Model adapter: routes a turn to a native provider; open_model()
+  wire.py           StreamEvent / AssistantMessage / ToolCall (the model-layer contract)
+  providers/        native httpx model layer (openai_compat, anthropic, oauth, catalog)
   types.py          messages, the agent event taxonomy, the Tool protocol, converters
   system_prompt.py  build_system_prompt (tools + guidelines + skills + project context)
   render.py         event stream → terminal (rich)

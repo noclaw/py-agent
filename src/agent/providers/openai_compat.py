@@ -14,8 +14,8 @@ import json
 from typing import Any, AsyncIterator
 
 import httpx
-from pi_py_sdk import AssistantMessage, StreamEvent
 
+from ..wire import AssistantMessage, StreamEvent
 from .http import DEFAULT_TIMEOUT, iter_sse
 
 __all__ = ["OpenAICompatProvider"]

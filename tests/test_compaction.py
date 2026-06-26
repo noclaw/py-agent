@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pi_py_sdk import AssistantMessage
+from agent.wire import AssistantMessage
 
 from agent.compaction import CompactionConfig, Compactor, estimate_tokens
 from agent.types import (

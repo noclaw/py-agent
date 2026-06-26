@@ -23,7 +23,7 @@ def _ctx(cwd=".", history=None, permissions=None):
     console = Console(file=buffer, force_terminal=False, width=200)
     registry = build_registry(cwd)
     # client=None is fine: the commands only read/mutate provider/model strings.
-    model = Model(None, provider="anthropic", model="claude-sonnet-4-6")  # type: ignore[arg-type]
+    model = Model(provider="anthropic", model="claude-sonnet-4-6")
     ctx = CommandContext(
         console=console,
         history=history if history is not None else [],

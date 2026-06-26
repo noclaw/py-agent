@@ -4,16 +4,21 @@ Guidance for working in this repository.
 
 ## What this is
 
-`py-agent` is a Python port of the Pi coding agent. **The agent loop and tools are
-written in Python here**; the **model layer** is delegated to Pi's `pi-ai` via the
-`pi-py` SDK (`PiModelClient`). It is an *example implementation* — optimized for being
-read and modified (learning Python; a base for assistant / second-brain agents), not for
-maximal features.
+`py-agent` is a Python coding agent originally ported from Pi. **The whole thing is Python**
+— the agent loop, the tools, and (as of Providers Phase 2, see `PROVIDERS.md`) the model
+layer, which now talks directly to provider HTTP APIs over `httpx`. No Node, no shim. It is
+an *example implementation* — optimized for being read and modified (learning Python; a base
+for assistant / second-brain agents), not for maximal features.
 
-**Core principle:** keep the loop and tools readable Python. Only the raw LLM call goes
-out of process (to `pi-ai`, through `pi-py`). Do not reimplement providers/auth/transports
-in Python — that's `pi-ai`'s job. Do not hide agent logic behind the Node runtime — that's
-the whole point of writing it here.
+**Core principle:** keep everything readable Python, in-process. The model layer lives in
+`agent/providers/` (`openai-completions` and `anthropic-messages` backends); add a provider
+by implementing the small `Provider` protocol. We deliberately support a limited set of
+providers — exotic transports (Bedrock/Vertex/Azure) are a user's custom code, not ours.
+
+> History: the model layer used to be delegated out-of-process to Pi's `pi-ai` via the
+> `pi-py` SDK + a Node shim. That dependency was removed in Providers Phase 2. Some
+> port-target comments still reference the Pi/TypeScript originals — that's lineage, not a
+> runtime dependency.
 
 ## Layout
 
@@ -23,7 +28,11 @@ src/agent/
   app.py            # REPL + one-shot runner; policy wiring (perms/hooks/retry/compaction)
   loop.py           # the agent loop                       (← agent/src/agent-loop.ts)
   types.py          # AgentMessage, events, Tool protocol  (← agent/src/types.ts)
-  model.py          # adapter over pi_py_sdk.PiModelClient + model registry
+  model.py          # Model adapter: routes a turn to a native provider by API flavor
+  wire.py           # native StreamEvent / AssistantMessage / ToolCall (the model contract)
+  providers/        # native httpx model layer: openai_compat, anthropic, oauth, catalog
+  models_registry.py# custom/local models from .pya/models.json
+  picker.py         # fuzzy model picker for /model
   system_prompt.py  # build_system_prompt                  (← coding-agent/.../system-prompt.ts)
   config.py         # settings + defaults                  (← coding-agent/src/config.ts)
   render.py         # event -> terminal rendering
@@ -35,42 +44,48 @@ src/agent/
   compaction.py     # context compaction (transform_context seam)
   retry.py          # RetryPolicy for transient model errors
   tools/            # read/write/edit/bash/grep/find/ls + task (sub-agent)
-tests/              # pytest; unit tests need no Node (fake model)
+tests/              # pytest; unit tests use a fake model (no network)
 docs/               # design + usage guides (start at docs/README.md)
-PLAN.md             # status + Potential Features roadmap + Pi module map
+PLAN.md             # status + Potential Features roadmap
+PROVIDERS.md        # the native provider-layer plan (Phases 1 & 2, done)
 ```
 
-## Dependency on pi-py
+## The model layer (`agent/providers/`)
 
-`pi-py-sdk` (the `../pi-py` checkout) is the model bridge. The relevant entry point is
-`PiModelClient`:
+Native Python over `httpx` — no subprocess. The pieces:
 
-```python
-async with PiModelClient() as client:
-    async for ev in client.stream(provider=..., model=..., messages=..., tools=...):
-        ...  # text_delta / thinking_delta / toolcall_end / terminal done|error
-```
+- `wire.py` — `StreamEvent` / `AssistantMessage` / `ToolCall`: the contract the loop,
+  renderer, and sessions speak. A provider's job is to turn its HTTP stream into these.
+- `providers/base.py` — the `Provider` protocol: `stream(...)` + `list_models()`.
+- `providers/openai_compat.py` — OpenAI Chat Completions (OpenAI + local/OpenAI-compatible).
+- `providers/anthropic.py` — Anthropic Messages (streaming, thinking + signature, tool use).
+- `providers/oauth.py` — Claude Pro/Max OAuth via `~/.pi/agent/auth.json` (no API key needed).
+- `providers/catalog.py` — static routing (provider → api/baseUrl/env) + a curated model list.
+- `providers/http.py` — shared httpx SSE iteration.
 
-It's wired as an editable path dependency, so edits in `../pi-py` are picked up without
-reinstalling. If you change the streaming protocol, change it there.
+`model.py` selects a provider by the model's `api` (`openai-completions` / `anthropic-messages`),
+resolved from the catalog (built-ins) or a `.pya/models.json` spec (custom/local). To stream
+a transport we don't ship, implement `Provider` and register the model under a custom `api`.
 
 ## Conventions
 
-Match pi-py's style: 4-space indent, type hints, `from __future__ import annotations`,
+4-space indent, type hints, `from __future__ import annotations`,
 Google-ish docstrings. No linter configured yet. Async-first; provide sync where it helps
 the CLI.
 
 ## Testing approach
 
 The key fixture is a **fake model** (scripted `StreamEvent` sequences) so the loop and
-tools are tested without the network. Live model calls go behind the `integration` marker
-and are skipped unless `PI_LIVE_LLM=1`.
+tools are tested without the network. Providers are tested with `httpx.MockTransport` fed
+canned SSE — also no network. Live model calls go behind the `integration` marker and are
+skipped unless `PYA_LIVE_LLM=1` (and `ANTHROPIC_API_KEY` is set).
 
 ## Status
 
-All seven core phases and the Claude-Code-shaped extras (permissions, hooks, commands,
-sessions, skills, compaction, auto-retry, sub-agents) are built — see `PLAN.md` for the full
-status and the **Potential Features** list (memory tools, settings/model registry, images,
+All seven core phases, the Claude-Code-shaped extras (permissions, hooks, commands,
+sessions, skills, compaction, auto-retry, sub-agents), the model registry + `/model` picker,
+and the **native provider layer** (`PROVIDERS.md`, Phases 1–2) are built — see `PLAN.md` for
+the full status and the **Potential Features** list (memory tools, settings file, images,
 web tools, MCP, …) for anything new. Keep changes scoped and the loop/tools readable; put
 policy in the app layer, not the loop.
 
