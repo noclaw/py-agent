@@ -1,12 +1,14 @@
 """Model adapter.
 
-A thin wrapper over :class:`pi_py_sdk.model.PiModelClient` that holds the
-provider/model/reasoning choice and streams one assistant turn. The agent loop depends on
-the small :class:`ModelLike` protocol (so a fake model can stand in for tests), not on
-this concrete class.
+Holds the provider/model/reasoning choice and streams one assistant turn. The agent loop
+depends on the small :class:`ModelLike` protocol (so a fake model can stand in for tests),
+not on this concrete class.
 
-Credential resolution lives entirely in pi-ai / the shim (caller key > provider env var >
-``~/.pi/agent/auth.json`` OAuth) — there's nothing to do here but pass options through.
+Routing (Providers Phase 1 — see ``PROVIDERS.md``): an OpenAI-compatible model (built-in
+``openai`` et al., or a custom ``.pya/models.json`` entry with ``api: openai-completions``)
+streams natively over httpx via :mod:`agent.providers`. Everything else (Anthropic) routes
+to the transitional ``pi`` backend, which is started lazily — so an OpenAI-only run never
+spawns Node. Phase 2 adds a native Anthropic backend and removes the pi dependency.
 """
 
 from __future__ import annotations
@@ -14,9 +16,12 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator, Protocol
 
+import httpx
 from pi_py_sdk import PiModelClient, StreamEvent
 
 from .config import DEFAULT_MODEL, DEFAULT_PROVIDER, DEFAULT_REASONING
+from .providers import NATIVE_APIS, OpenAICompatProvider, Route, route_for
+from .providers.auth import resolve_api_key
 
 
 class ModelLike(Protocol):
@@ -32,16 +37,17 @@ class ModelLike(Protocol):
 
 
 class Model:
-    """Holds model config and streams a turn via a (started) ``PiModelClient``."""
+    """Holds model config and streams a turn, routing to a native or the pi backend."""
 
     def __init__(
         self,
-        client: PiModelClient,
+        client: PiModelClient | None,
         *,
         provider: str = DEFAULT_PROVIDER,
         model: str = DEFAULT_MODEL,
         reasoning: str | None = DEFAULT_REASONING,
         spec: dict[str, Any] | None = None,
+        transport: httpx.BaseTransport | None = None,
         **options: Any,
     ) -> None:
         self._client = client
@@ -49,7 +55,9 @@ class Model:
         self._model = model
         self._spec = spec  # full model object for a custom/local model (else None)
         self._reasoning = reasoning
+        self._transport = transport  # test seam: injected into the native httpx provider
         self._options = options
+        self._pi_started = False
 
     @property
     def name(self) -> str:
@@ -68,18 +76,36 @@ class Model:
     ) -> None:
         """Switch the model (and optionally provider) for subsequent turns.
 
-        Cheap: the underlying client streams any model, so this just changes which
-        provider/model the next ``stream`` call targets. Pass ``spec`` for a custom/local
-        model (a full pi-ai model object); omit it to select a built-in by id.
+        Pass ``spec`` for a custom/local model (a full model object); omit it to select a
+        built-in by id. Routing is recomputed per ``stream`` call, so this is cheap.
         """
         self._model = model
         self._spec = spec
         if provider is not None:
             self._provider = provider
 
+    def _route(self) -> Route | None:
+        """Resolve how to reach the current model, or ``None`` to use the pi backend."""
+        if self._spec is not None:
+            known = route_for(self._provider, self._model)
+            return Route(
+                api=self._spec.get("api", "openai-completions"),
+                base_url=self._spec.get("baseUrl") or (known.base_url if known else ""),
+                env_var=known.env_var if known else None,
+            )
+        return route_for(self._provider, self._model)
+
+    async def _ensure_pi(self) -> None:
+        if self._client is None:
+            raise RuntimeError(f"No pi backend available for {self.name}")
+        if not self._pi_started:
+            await self._client.start()
+            self._pi_started = True
+
     async def list_models(self, provider: str | None = None) -> list[dict[str, Any]]:
-        """List the models pi-ai's built-in catalog knows about (optionally one provider)."""
-        return await self._client.list_models(provider)
+        """List the models the (transitional) pi catalog knows about. Starts pi lazily."""
+        await self._ensure_pi()
+        return await self._client.list_models(provider)  # type: ignore[union-attr]
 
     async def stream(
         self,
@@ -88,21 +114,30 @@ class Model:
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
     ) -> AsyncIterator[StreamEvent]:
-        # A custom model streams as a full spec object; a built-in streams by id.
+        route = self._route()
+        if route is not None and route.api in NATIVE_APIS:
+            provider_impl = OpenAICompatProvider(
+                base_url=route.base_url,
+                api_key=resolve_api_key(route, self._spec),
+                provider=self._provider,
+                transport=self._transport,
+            )
+            async for event in provider_impl.stream(
+                model=self._model, system_prompt=system_prompt, messages=messages,
+                tools=tools, reasoning=self._reasoning, **self._options,
+            ):
+                yield event
+            return
+
+        # Transitional pi backend (Anthropic and any non-native provider).
+        await self._ensure_pi()
         target: str | dict[str, Any] = self._spec if self._spec is not None else self._model
         options = dict(self._options)
-        # A custom/local endpoint's key lives in its spec; pi-ai resolves credentials from
-        # the stream options (caller key > env var > OAuth), so surface it there.
         if self._spec is not None and self._spec.get("apiKey") and "apiKey" not in options:
             options["apiKey"] = self._spec["apiKey"]
-        async for event in self._client.stream(
-            provider=self._provider,
-            model=target,
-            messages=messages,
-            system_prompt=system_prompt,
-            tools=tools,
-            reasoning=self._reasoning,
-            **options,
+        async for event in self._client.stream(  # type: ignore[union-attr]
+            provider=self._provider, model=target, messages=messages,
+            system_prompt=system_prompt, tools=tools, reasoning=self._reasoning, **options,
         ):
             yield event
 
@@ -114,21 +149,24 @@ async def open_model(
     model: str = DEFAULT_MODEL,
     reasoning: str | None = DEFAULT_REASONING,
     spec: dict[str, Any] | None = None,
+    transport: httpx.BaseTransport | None = None,
     client_kwargs: dict[str, Any] | None = None,
     **options: Any,
 ) -> AsyncIterator[Model]:
-    """Create and start a ``PiModelClient``, yield a :class:`Model`, and clean up.
+    """Yield a :class:`Model`, cleaning up the pi backend if it was started.
 
-        async with open_model(provider="anthropic", model="claude-sonnet-4-6") as model:
+        async with open_model(provider="openai", model="gpt-5.1") as model:
             async for event in run_agent(model, tools, history):
                 ...
 
-    Pass ``spec`` (a full pi-ai model object) for a custom/local model; ``provider``/``model``
-    then name it for display/sessions while ``spec`` is what's streamed.
+    The pi backend starts lazily (only when a non-native model streams), so OpenAI-compatible
+    runs spawn no Node subprocess. ``spec`` selects a custom/local model.
     """
     client = PiModelClient(**(client_kwargs or {}))
-    await client.start()
     try:
-        yield Model(client, provider=provider, model=model, reasoning=reasoning, spec=spec, **options)
+        yield Model(
+            client, provider=provider, model=model, reasoning=reasoning, spec=spec,
+            transport=transport, **options,
+        )
     finally:
-        await client.stop()
+        await client.stop()  # safe no-op if pi was never started
