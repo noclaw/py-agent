@@ -7,8 +7,7 @@ concrete class.
 
 Routing is by the model's ``api``: ``openai-completions`` (OpenAI + local/OpenAI-compatible)
 and ``anthropic-messages`` (Claude) stream natively. A model's ``api``/``baseUrl`` come from
-the static catalog (built-ins) or a ``.pya/models.json`` spec (custom/local). See
-``PROVIDERS.md``.
+the static catalog (built-ins) or a ``.pya/models.json`` spec (custom/local).
 """
 
 from __future__ import annotations

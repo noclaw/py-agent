@@ -1,8 +1,8 @@
-"""Anthropic Messages provider — ``POST /v1/messages`` over httpx (Providers Phase 2).
+"""Anthropic Messages provider — ``POST /v1/messages`` over httpx.
 
 Native streaming for Claude: text + extended thinking (with signature round-trip) + tool
 use, normalized into the same ``StreamEvent`` / ``AssistantMessage`` the loop already
-consumes. See ``PROVIDERS.md``.
+consumes.
 
 Auth: an API key on ``x-api-key`` (env ``ANTHROPIC_API_KEY`` or a custom spec key).
 

@@ -10,8 +10,7 @@ py-agent is a standalone Python coding agent — every layer is plain Python:
 
 The native model layer is small and focused: we ship OpenAI-compatible + Anthropic; exotic
 transports are user custom code (implement the `Provider` protocol). The tradeoff buys no
-extra runtime, no out-of-process bridge, and full control of local models (Providers Phases
-1–2, see [`PROVIDERS.md`](../PROVIDERS.md)).
+extra runtime, no out-of-process bridge, and full control of local models.
 
 ## The model layer
 

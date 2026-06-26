@@ -5,8 +5,8 @@ Guidance for working in this repository.
 ## What this is
 
 `py-agent` is a readable, standalone Python coding agent. **The whole thing is Python**
-— the agent loop, the tools, and (as of Providers Phase 2, see `PROVIDERS.md`) the model
-layer, which now talks directly to provider HTTP APIs over `httpx`. No Node, no shim. It is
+— the agent loop, the tools, and the model layer, which talks directly to provider HTTP
+APIs over `httpx`. No Node, no shim. It is
 an *example implementation* — optimized for being read and modified (learning Python; a base
 for assistant / second-brain agents), not for maximal features.
 
@@ -44,7 +44,6 @@ src/agent/
 tests/              # pytest; unit tests use a fake model (no network)
 docs/               # design + usage guides (start at docs/README.md)
 PLAN.md             # status + Potential Features roadmap
-PROVIDERS.md        # the native provider-layer plan (Phases 1 & 2, done)
 ```
 
 ## The model layer (`agent/providers/`)
@@ -81,7 +80,7 @@ skipped unless `PYA_LIVE_LLM=1` (and `ANTHROPIC_API_KEY` is set).
 
 All seven core phases, the Claude-Code-shaped extras (permissions, hooks, commands,
 sessions, skills, compaction, auto-retry, sub-agents), the model registry + `/model` picker,
-and the **native provider layer** (`PROVIDERS.md`, Phases 1–2) are built — see `PLAN.md` for
+and the **native provider layer** are built — see `PLAN.md` for
 the full status and the **Potential Features** list (memory tools, settings file, images,
 web tools, MCP, …) for anything new. Keep changes scoped and the loop/tools readable; put
 policy in the app layer, not the loop.

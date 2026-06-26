@@ -35,8 +35,8 @@ to a model provider.
                           provider HTTP APIs (OpenAI-compatible / Anthropic)
 ```
 
-The native model layer replaced an earlier out-of-process approach — see the (now complete)
-[`PROVIDERS.md`](PROVIDERS.md) migration design.
+The native model layer replaced an earlier out-of-process approach; it now talks to provider
+HTTP APIs directly over `httpx` (see the model-layer notes in `CLAUDE.md`).
 
 ---
 
@@ -87,7 +87,7 @@ Beyond the seven core phases, these optional features are also built:
 - ✅ **Native provider layer** (`agent/providers/`) — model calls go directly to provider
   HTTP APIs over httpx (`openai-completions` + `anthropic-messages` backends); `wire.py`
   holds the native message/stream types. No Node, no subprocess. Exotic transports
-  (Bedrock/Vertex/Azure) are out of scope — add a `Provider`. Design: `PROVIDERS.md`.
+  (Bedrock/Vertex/Azure) are out of scope — add a `Provider`.
 - ✅ **Web tools** — read-only `web_fetch` (URL → readable text) and `web_search` (keyless
   DuckDuckGo) over httpx, in the default `coding_tools` set. `tools/web.py`.
 - ✅ **Edit checkpoints / undo** — snapshot a file's bytes before each successful

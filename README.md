@@ -13,8 +13,8 @@ toolset for your own).
 > the agent loop, system prompt, interactive CLI/REPL, **permissions**, **hooks**, **slash
 > commands** with custom markdown commands, **skills**, **session** save/resume,
 > **compaction**, **auto-retry**, **sub-agents** (a `task` tool), a **model picker**, and a
-> **native provider layer** (OpenAI-compatible + Anthropic, no Node — see
-> [`PROVIDERS.md`](PROVIDERS.md)). Next: memory / second-brain tools. See [`PLAN.md`](PLAN.md).
+> **native provider layer** (OpenAI-compatible + Anthropic, no Node). Next: memory /
+> second-brain tools. See [`PLAN.md`](PLAN.md).
 
 ## Architecture
 

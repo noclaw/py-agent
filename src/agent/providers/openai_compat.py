@@ -1,7 +1,7 @@
 """OpenAI-compatible provider — ``POST /chat/completions`` over httpx.
 
 Covers OpenAI and the many servers that speak the same protocol: Ollama, LM Studio, vLLM,
-llama.cpp, Together, Groq, OpenRouter, … This is Providers Phase 1 (see ``PROVIDERS.md``).
+llama.cpp, Together, Groq, OpenRouter, ….
 
 It converts py-agent's wire messages to OpenAI Chat Completions, streams the
 SSE response, assembles tool-call argument fragments, and emits the same ``StreamEvent`` /

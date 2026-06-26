@@ -4,7 +4,7 @@ The model layer is native Python (`agent/providers/`) talking directly to provid
 over `httpx` — no Node, no SDK. Two backends ship: **`openai-completions`** (OpenAI and any
 OpenAI-compatible server — Ollama, LM Studio, vLLM, Groq, Together, OpenRouter, …) and
 **`anthropic-messages`** (Claude). To support another transport, implement the `Provider`
-protocol. See [architecture](architecture.md) and [`PROVIDERS.md`](../PROVIDERS.md).
+protocol. See [architecture](architecture.md).
 
 ## Choosing a model
 

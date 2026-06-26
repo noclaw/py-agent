@@ -3,7 +3,7 @@
 Talks directly to provider HTTP APIs over httpx — no Node, no shim, no SDK. Ships two
 backends: ``openai-completions`` (OpenAI + most local / OpenAI-compatible servers) and
 ``anthropic-messages`` (Claude). Custom transports plug in via the :class:`Provider`
-protocol and a ``.pya/models.json`` entry. See ``PROVIDERS.md``.
+protocol and a ``.pya/models.json`` entry.
 """
 
 from __future__ import annotations

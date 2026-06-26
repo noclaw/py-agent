@@ -1,9 +1,8 @@
 """Credential resolution for the native provider layer.
 
-Phase 1: an explicit key in the model spec (custom/local models) wins, else the provider's
-environment variable. OAuth (Claude Pro/Max, Codex) lands in Providers Phase 2 — see
-``PROVIDERS.md``. Returns ``None`` when no key is found; a local server that needs no auth
-works fine without one.
+An explicit key in the model spec (custom/local models) wins, else the provider's
+environment variable. Returns ``None`` when no key is found; a local server that needs no
+auth works fine without one.
 """
 
 from __future__ import annotations
