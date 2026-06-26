@@ -57,6 +57,41 @@ def test_invalid_toml_is_empty(tmp_path):
     assert not s.configured
 
 
+SCALARS = """
+default = "openai/gpt-5.1"
+reasoning = "low"
+permission_mode = "acceptEdits"
+max_retries = 3
+context_window = 400000
+compact = false
+subagent = false
+
+[providers.openai]
+models = ["gpt-5.1"]
+"""
+
+
+def test_scalar_settings_parse_and_roundtrip(tmp_path):
+    s = settings_mod.load(_write(tmp_path, SCALARS))
+    assert s.reasoning == "low" and s.permission_mode == "acceptEdits"
+    assert s.max_retries == 3 and s.context_window == 400000
+    assert s.compact is False and s.subagent is False
+    out = tmp_path / "out.toml"
+    settings_mod.save(s, out)
+    again = settings_mod.load(out)
+    assert (again.reasoning, again.max_retries, again.compact, again.subagent) == ("low", 3, False, False)
+    assert again.providers["openai"].models == ("gpt-5.1",)  # providers preserved alongside scalars
+
+
+def test_infer_context_window():
+    from agent.app import _infer_context_window
+    from agent.config import DEFAULT_CONTEXT_WINDOW
+
+    assert _infer_context_window("claude-opus-4-8", None) == 1_000_000   # from the catalog
+    assert _infer_context_window("anything", {"contextWindow": 1234}) == 1234  # from a spec
+    assert _infer_context_window("unknown-model", None) == DEFAULT_CONTEXT_WINDOW
+
+
 def test_save_roundtrips(tmp_path):
     path = tmp_path / "out.toml"
     original = settings_mod.load(_write(tmp_path, SAMPLE))
@@ -99,22 +134,30 @@ def test_catalog_models_falls_back_to_all_builtins(tmp_path, monkeypatch):
     assert settings_mod.catalog_models() == builtin_models()
 
 
-def test_resolve_api_key_uses_settings_when_no_env(tmp_path, monkeypatch):
+def _isolate(tmp_path, monkeypatch):
+    """Isolate both credential sources from the real ~/.pya (settings.toml + auth.json)."""
+    from agent.providers import oauth
+
     monkeypatch.setattr(settings_mod, "SETTINGS_PATH", _write(tmp_path, SAMPLE))
+    monkeypatch.setattr(oauth, "TOKEN_STORE", tmp_path / "auth.json")
+
+
+def test_resolve_api_key_uses_settings_when_no_env(tmp_path, monkeypatch):
+    _isolate(tmp_path, monkeypatch)
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     route = KNOWN_PROVIDERS["anthropic"]
     assert auth.resolve_api_key(route, None, provider="anthropic") == "sk-ant-test"
 
 
 def test_env_overrides_settings(tmp_path, monkeypatch):
-    monkeypatch.setattr(settings_mod, "SETTINGS_PATH", _write(tmp_path, SAMPLE))
+    _isolate(tmp_path, monkeypatch)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-env-wins")
     route = KNOWN_PROVIDERS["anthropic"]
     assert auth.resolve_api_key(route, None, provider="anthropic") == "sk-env-wins"
 
 
 def test_spec_key_wins_over_everything(tmp_path, monkeypatch):
-    monkeypatch.setattr(settings_mod, "SETTINGS_PATH", _write(tmp_path, SAMPLE))
+    _isolate(tmp_path, monkeypatch)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-env")
     route = KNOWN_PROVIDERS["anthropic"]
     assert auth.resolve_api_key(route, {"apiKey": "sk-spec"}, provider="anthropic") == "sk-spec"

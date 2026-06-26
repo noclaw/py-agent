@@ -33,8 +33,16 @@ keep it out of any repo.
 ```toml
 default = "anthropic/claude-opus-4-8"        # optional default model
 
+# Optional runtime defaults (each also a CLI flag; the flag wins, then this, then the
+# built-in default). reasoning, permission_mode, max_retries, context_window, compact, subagent:
+reasoning       = "low"                      # minimal|low|medium|high|xhigh
+permission_mode = "acceptEdits"              # default|acceptEdits|plan|bypass
+max_retries     = 2
+compact         = true
+# context_window = 200000                    # omit to infer from the model's metadata
+
 [providers.anthropic]
-api_key = "sk-ant-api03-..."                 # optional (else the provider's env var)
+api_key = "sk-ant-api03-..."                 # optional (else the provider's env var / pya auth)
 models  = ["claude-opus-4-8", "claude-sonnet-4-6"]   # optional allowlist
 
 [providers.openai]
@@ -48,6 +56,9 @@ models  = ["gpt-5.1", "gpt-5-codex"]
   from `.pya/models.json`. (With nothing configured, the full curated catalog shows.)
 - **Curated models** — `models = [...]` is exactly what you can pick; omit it to fall back to
   the curated built-ins for that provider.
+- **Runtime defaults** — the scalar keys set defaults for the matching CLI flags. A CLI flag
+  always overrides; `context_window` is otherwise inferred per model from the catalog/registry
+  metadata (the `--context-window` flag still overrides).
 
 The `api_key` is keyed by provider name, so it also supplies the key for a local provider
 defined in `.pya/models.json` (keep the key here, the endpoint there). Set
@@ -59,8 +70,10 @@ so hand-added comments aren't preserved):
 ```bash
 pya config show
 pya config set-default anthropic/claude-opus-4-8
-pya config models openai gpt-5.1 gpt-5-codex   # set a provider's allowlist (also enables it)
-pya config models groq                          # enable a provider with the curated built-ins
+pya config set reasoning low                    # any scalar key; `pya config unset <key>` clears it
+pya config set permission_mode acceptEdits
+pya config models openai gpt-5.1 gpt-5-codex    # set a provider's allowlist (also enables it)
+pya config models groq                           # enable a provider with the curated built-ins
 pya config remove-provider openai
 ```
 

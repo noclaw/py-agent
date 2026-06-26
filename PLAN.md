@@ -114,22 +114,22 @@ files or sqlite). Demonstrates swapping the coding toolset for an assistant tool
 same registry — directly serves goal (b). Good companion to
 [`docs/building-your-own-agent.md`](docs/building-your-own-agent.md).
 
-### 2. Settings file (model registry ✅ · settings ◑ in progress)
+### 2. Settings file + model registry ✅ done
 
-The **model registry** shipped — custom/local models in `.pya/models.json`, selectable from
-the CLI and the `/model` picker (`models_registry.py`, `picker.py`).
+The **model registry** — custom/local models in `.pya/models.json`, selectable from the CLI
+and the `/model` picker (`models_registry.py`, `picker.py`).
 
-The **settings file** (`~/.pya/settings.toml`, `settings.py`) landed for: provider API keys
-(no `export`), scoping which providers/models the catalog offers, a per-provider model
-allowlist, and a `default` model. Credential order: spec key → env var → settings.
+The **settings file** (`~/.pya/settings.toml`, `settings.py`): provider API keys (no
+`export`), provider/model scoping + allowlist, a `default` model, and runtime defaults
+(`reasoning`, `permission_mode`, `max_retries`, `context_window`, `compact`, `subagent`).
+Resolution is CLI flag → settings → built-in default; `context_window` is inferred per model
+from catalog/registry metadata when unset. Credential order: spec key → env → `pya auth set`
+(`~/.pya/auth.json`, chmod 600) → settings.
 
-`pya auth set/list/remove` manage stored API keys in `~/.pya/auth.json` (chmod 600);
-`pya config show/set-default/models/remove-provider` manage the non-secret prefs. The catalog
-is scoped to providers in use (configured *or* key-stored).
+Commands: `pya auth set/list/remove`; `pya config show/set/unset/set-default/models/remove-provider`.
 
-Still open: moving permission-mode and retry/compaction tuning into settings; inferring
-`--context-window` per model (the catalog/registry carry `contextWindow`) instead of the
-hard-coded flag.
+(Optional later: project-level `.pya/settings.toml` overrides; a `models.json`-vs-settings
+unification.)
 
 ### 3. Images / vision
 

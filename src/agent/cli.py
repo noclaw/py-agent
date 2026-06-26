@@ -45,11 +45,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--permission-mode",
-        default="default",
+        default=None,
         choices=["default", "acceptEdits", "plan", "bypass"],
         help=(
             "How to gate mutating tools: default (ask), acceptEdits (auto-allow "
-            "write/edit), plan (deny mutations), bypass (allow everything)."
+            "write/edit), plan (deny mutations), bypass (allow everything). "
+            "Falls back to settings, then 'default'."
         ),
     )
     parser.add_argument(
@@ -78,8 +79,8 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--max-retries",
         type=int,
-        default=2,
-        help="Retries for transient model errors per turn (0 disables; default: 2).",
+        default=None,
+        help="Retries for transient model errors per turn (0 disables; default: settings or 2).",
     )
     parser.add_argument(
         "--no-compact",
@@ -89,8 +90,8 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--context-window",
         type=int,
-        default=200_000,
-        help="Model context window in tokens, used to size compaction (default: 200000).",
+        default=None,
+        help="Context window (tokens) used to size compaction (default: settings, else inferred from the model, else 200000).",
     )
     parser.add_argument(
         "--no-subagent",
@@ -125,6 +126,11 @@ def _build_parser() -> argparse.ArgumentParser:
     cfg_sub.add_parser("show", help="Show current settings.")
     pdef = cfg_sub.add_parser("set-default", help="Set the default model (provider/model).")
     pdef.add_argument("model", metavar="provider/model")
+    pset = cfg_sub.add_parser("set", help="Set a scalar setting (reasoning, permission_mode, max_retries, context_window, compact, subagent).")
+    pset.add_argument("key")
+    pset.add_argument("value")
+    puns = cfg_sub.add_parser("unset", help="Clear a scalar setting (revert to the default).")
+    puns.add_argument("key")
     pmodels = cfg_sub.add_parser("models", help="Set a provider's model allowlist (omit models to clear it / enable with built-ins).")
     pmodels.add_argument("provider")
     pmodels.add_argument("models", nargs="*", help="Model ids to allow (none = clear the allowlist).")
@@ -134,16 +140,40 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _coerce_setting(key: str, value: str):
+    from .settings import SCALAR_KEYS
+
+    typ = SCALAR_KEYS.get(key)
+    if typ is None:
+        raise KeyError(key)
+    if typ is bool:
+        if value.lower() not in ("true", "false"):
+            raise ValueError("expected true or false")
+        return value.lower() == "true"
+    if typ is int:
+        return int(value)
+    if key == "reasoning" and value not in ("minimal", "low", "medium", "high", "xhigh"):
+        raise ValueError("reasoning must be one of minimal/low/medium/high/xhigh")
+    if key == "permission_mode" and value not in ("default", "acceptEdits", "plan", "bypass"):
+        raise ValueError("permission_mode must be default/acceptEdits/plan/bypass")
+    return value
+
+
 def _cmd_config(args) -> int:
-    from .settings import ProviderConfig, Settings, SETTINGS_PATH, load, save
+    import dataclasses
+
+    from .settings import SCALAR_KEYS, ProviderConfig, SETTINGS_PATH, load, save
 
     s = load()
     if args.config_command in (None, "show"):
-        if not (s.default_model or s.providers):
+        scalars = {k: getattr(s, k) for k in SCALAR_KEYS if getattr(s, k) is not None}
+        if not (s.default_model or s.providers or scalars):
             print(f"(no settings in {SETTINGS_PATH})")
             return 0
         if s.default_provider and s.default_model:
             print(f"default = {s.default_provider}/{s.default_model}")
+        for k, v in scalars.items():
+            print(f"{k} = {v}")
         for name in sorted(s.providers):
             cfg = s.providers[name]
             key = f" key=…{cfg.api_key[-4:]}" if cfg.api_key else ""
@@ -157,20 +187,36 @@ def _cmd_config(args) -> int:
             print("[error] expected provider/model, e.g. anthropic/claude-opus-4-8", file=sys.stderr)
             return 1
         dp, dm = args.model.split("/", 1)
-        save(Settings(default_provider=dp, default_model=dm, providers=providers))
+        save(dataclasses.replace(s, default_provider=dp, default_model=dm))
         print(f"default = {dp}/{dm}")
+        return 0
+    if args.config_command in ("set", "unset"):
+        if args.key not in SCALAR_KEYS:
+            print(f"[error] unknown setting {args.key!r}; choose from: {', '.join(SCALAR_KEYS)}", file=sys.stderr)
+            return 1
+        if args.config_command == "unset":
+            save(dataclasses.replace(s, **{args.key: None}))
+            print(f"{args.key} cleared")
+            return 0
+        try:
+            value = _coerce_setting(args.key, args.value)
+        except (ValueError, KeyError) as exc:
+            print(f"[error] {exc}", file=sys.stderr)
+            return 1
+        save(dataclasses.replace(s, **{args.key: value}))
+        print(f"{args.key} = {value}")
         return 0
     if args.config_command == "models":
         existing = providers.get(args.provider, ProviderConfig())
         providers[args.provider] = ProviderConfig(api_key=existing.api_key, models=tuple(args.models))
-        save(Settings(default_provider=s.default_provider, default_model=s.default_model, providers=providers))
+        save(dataclasses.replace(s, providers=providers))
         print(f"{args.provider}: " + (", ".join(args.models) if args.models else "(built-ins)"))
         return 0
     if args.config_command == "remove-provider":
         if providers.pop(args.provider, None) is None:
             print(f"No provider {args.provider} in settings.")
             return 0
-        save(Settings(default_provider=s.default_provider, default_model=s.default_model, providers=providers))
+        save(dataclasses.replace(s, providers=providers))
         print(f"Removed provider {args.provider}.")
         return 0
     return 0
@@ -232,27 +278,35 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     # Default: one-shot if -p was given, otherwise the interactive REPL.
     from .app import run
+    from .config import DEFAULT_COMPACT, DEFAULT_MAX_RETRIES, DEFAULT_PERMISSION_MODE, DEFAULT_SUBAGENT
     from .settings import load as load_settings
 
-    settings = load_settings()
-    provider = args.provider or settings.default_provider or DEFAULT_PROVIDER
-    model = args.model or settings.default_model or DEFAULT_MODEL
+    s = load_settings()
 
-    permission_mode = "bypass" if args.yolo else args.permission_mode
+    def pick(flag, setting, default):  # CLI flag > settings > default
+        return flag if flag is not None else (setting if setting is not None else default)
+
+    provider = args.provider or s.default_provider or DEFAULT_PROVIDER
+    model = args.model or s.default_model or DEFAULT_MODEL
+    permission_mode = "bypass" if args.yolo else pick(args.permission_mode, s.permission_mode, DEFAULT_PERMISSION_MODE)
+    # store_true flags can only force-off; settings (else the default) set the baseline.
+    compact = (s.compact if s.compact is not None else DEFAULT_COMPACT) and not args.no_compact
+    subagent = (s.subagent if s.subagent is not None else DEFAULT_SUBAGENT) and not args.no_subagent
+
     return run(
         provider=provider,
         model=model,
-        reasoning=args.reasoning,
+        reasoning=pick(args.reasoning, s.reasoning, None),
         cwd=args.cwd,
         prompt=args.prompt,
         permission_mode=permission_mode,
         continue_session=args.continue_session,
         resume=args.resume,
         no_session=args.no_session,
-        max_retries=args.max_retries,
-        compact=not args.no_compact,
-        context_window=args.context_window,
-        subagent=not args.no_subagent,
+        max_retries=pick(args.max_retries, s.max_retries, DEFAULT_MAX_RETRIES),
+        compact=compact,
+        context_window=pick(args.context_window, s.context_window, None),  # None → inferred in run()
+        subagent=subagent,
     )
 
 

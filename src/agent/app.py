@@ -71,6 +71,17 @@ def _available_models(registry_models: ModelRegistry | None):
     return merge_catalog(catalog_models(), registry_models)
 
 
+def _infer_context_window(model: str, spec: dict | None) -> int:
+    """The model's context window: from a custom spec, else the catalog, else the default."""
+    from .config import DEFAULT_CONTEXT_WINDOW
+    from .providers.catalog import model_meta
+
+    if spec and spec.get("contextWindow"):
+        return int(spec["contextWindow"])
+    known = model_meta(model).get("contextWindow")
+    return int(known) if known else DEFAULT_CONTEXT_WINDOW
+
+
 def _make_transform(model, settings: _RunSettings) -> ContextTransform | None:
     """The optional compaction ``transform_context`` callback (``None`` when disabled)."""
     if not settings.compact:
@@ -190,7 +201,7 @@ def run(
     hooks: Hooks | None = None,
     max_retries: int = 2,
     compact: bool = True,
-    context_window: int = 200_000,
+    context_window: int | None = None,
     subagent: bool = True,
 ) -> int:
     """Entry point used by the CLI. Runs one-shot if ``prompt`` is given, else the REPL.
@@ -200,7 +211,8 @@ def run(
             git branch (see :func:`_build_default_hooks`). Pass ``Hooks()`` to disable.
         max_retries: transient-error retries per turn (0 disables auto-retry).
         compact: auto-summarize old history as it nears ``context_window``.
-        context_window: the model's context window, used to size compaction.
+        context_window: the model's context window, used to size compaction. ``None`` infers
+            it from the model's metadata (catalog/registry), falling back to a default.
         subagent: expose a ``task`` tool that can spawn sub-agents.
     """
     permissions = Permissions(mode=PermissionMode(permission_mode))
@@ -211,13 +223,15 @@ def run(
     if hooks is None:
         hooks = _build_default_hooks(cwd)
     retry = RetryPolicy(max_retries=max_retries) if max_retries > 0 else None
-    settings = _RunSettings(
-        hooks=hooks, retry=retry, compact=compact, context_window=context_window, subagent=subagent
-    )
     # A custom/local model id (from ~/.pya/models.json) resolves to a full spec to stream.
     mreg = load_model_registry(cwd)
     info = mreg.resolve(provider, model)
     spec = info.spec if info else None
+    if context_window is None:
+        context_window = _infer_context_window(model, spec)
+    settings = _RunSettings(
+        hooks=hooks, retry=retry, compact=compact, context_window=context_window, subagent=subagent
+    )
     try:
         if prompt is not None:
             return asyncio.run(

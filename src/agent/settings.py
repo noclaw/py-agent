@@ -48,11 +48,29 @@ class ProviderConfig:
     models: tuple[str, ...] = ()  # allowlist; empty = the curated built-ins for this provider
 
 
+#: Scalar (non-provider) settings keys, with the coercion used when parsing/editing them.
+SCALAR_KEYS: dict[str, type] = {
+    "reasoning": str,
+    "permission_mode": str,
+    "max_retries": int,
+    "context_window": int,
+    "compact": bool,
+    "subagent": bool,
+}
+
+
 @dataclass(frozen=True)
 class Settings:
     default_provider: str | None = None
     default_model: str | None = None
     providers: dict[str, ProviderConfig] = field(default_factory=dict)
+    # Optional runtime defaults (None = fall through to a CLI flag / agent.config default).
+    reasoning: str | None = None
+    permission_mode: str | None = None
+    max_retries: int | None = None
+    context_window: int | None = None
+    compact: bool | None = None
+    subagent: bool | None = None
 
     @property
     def configured(self) -> bool:
@@ -101,7 +119,8 @@ def load(path: Path | None = None) -> Settings:
                 api_key=block.get("api_key"),
                 models=tuple(str(m) for m in models),
             )
-    return Settings(default_provider=dp, default_model=dm, providers=providers)
+    scalars = {k: data.get(k) for k in SCALAR_KEYS if data.get(k) is not None}
+    return Settings(default_provider=dp, default_model=dm, providers=providers, **scalars)
 
 
 def catalog_models() -> list[dict[str, str]]:
@@ -132,6 +151,17 @@ def save(settings: Settings, path: Path | None = None) -> None:
     has_secret = False
     if settings.default_provider and settings.default_model:
         lines.append(f'default = "{settings.default_provider}/{settings.default_model}"')
+    for key in SCALAR_KEYS:
+        value = getattr(settings, key)
+        if value is None:
+            continue
+        if isinstance(value, bool):
+            lines.append(f"{key} = {'true' if value else 'false'}")
+        elif isinstance(value, int):
+            lines.append(f"{key} = {value}")
+        else:
+            lines.append(f"{key} = {_toml_str(str(value))}")
+    if lines:
         lines.append("")
     for name in sorted(settings.providers):
         cfg = settings.providers[name]

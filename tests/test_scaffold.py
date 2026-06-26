@@ -74,3 +74,20 @@ def test_config_commands(tmp_path, monkeypatch, capsys):
 
     assert main(["config", "remove-provider", "openai"]) == 0
     assert "openai" not in settings_mod.load().providers
+
+
+def test_config_set_scalars(tmp_path, monkeypatch):
+    from agent import settings as settings_mod
+
+    monkeypatch.setattr(settings_mod, "SETTINGS_PATH", tmp_path / "settings.toml")
+    assert main(["config", "set", "max_retries", "5"]) == 0
+    assert main(["config", "set", "compact", "false"]) == 0
+    assert main(["config", "set", "permission_mode", "acceptEdits"]) == 0
+    s = settings_mod.load()
+    assert s.max_retries == 5 and s.compact is False and s.permission_mode == "acceptEdits"
+
+    assert main(["config", "set", "reasoning", "bogus"]) == 1   # invalid value rejected
+    assert main(["config", "set", "nope", "1"]) == 1            # unknown key rejected
+
+    assert main(["config", "unset", "max_retries"]) == 0
+    assert settings_mod.load().max_retries is None
