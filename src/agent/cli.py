@@ -120,7 +120,60 @@ def _build_parser() -> argparse.ArgumentParser:
     p_rm = auth_sub.add_parser("remove", help="Remove a provider's stored credential.")
     p_rm.add_argument("provider")
 
+    p_config = sub.add_parser("config", help="View/edit non-secret settings (~/.pya/settings.toml).")
+    cfg_sub = p_config.add_subparsers(dest="config_command")
+    cfg_sub.add_parser("show", help="Show current settings.")
+    pdef = cfg_sub.add_parser("set-default", help="Set the default model (provider/model).")
+    pdef.add_argument("model", metavar="provider/model")
+    pmodels = cfg_sub.add_parser("models", help="Set a provider's model allowlist (omit models to clear it / enable with built-ins).")
+    pmodels.add_argument("provider")
+    pmodels.add_argument("models", nargs="*", help="Model ids to allow (none = clear the allowlist).")
+    pcrm = cfg_sub.add_parser("remove-provider", help="Remove a provider from settings.")
+    pcrm.add_argument("provider")
+
     return parser
+
+
+def _cmd_config(args) -> int:
+    from .settings import ProviderConfig, Settings, SETTINGS_PATH, load, save
+
+    s = load()
+    if args.config_command in (None, "show"):
+        if not (s.default_model or s.providers):
+            print(f"(no settings in {SETTINGS_PATH})")
+            return 0
+        if s.default_provider and s.default_model:
+            print(f"default = {s.default_provider}/{s.default_model}")
+        for name in sorted(s.providers):
+            cfg = s.providers[name]
+            key = f" key=…{cfg.api_key[-4:]}" if cfg.api_key else ""
+            models = (" models=" + ", ".join(cfg.models)) if cfg.models else " models=(built-ins)"
+            print(f"[{name}]{key}{models}")
+        return 0
+
+    providers = dict(s.providers)
+    if args.config_command == "set-default":
+        if "/" not in args.model:
+            print("[error] expected provider/model, e.g. anthropic/claude-opus-4-8", file=sys.stderr)
+            return 1
+        dp, dm = args.model.split("/", 1)
+        save(Settings(default_provider=dp, default_model=dm, providers=providers))
+        print(f"default = {dp}/{dm}")
+        return 0
+    if args.config_command == "models":
+        existing = providers.get(args.provider, ProviderConfig())
+        providers[args.provider] = ProviderConfig(api_key=existing.api_key, models=tuple(args.models))
+        save(Settings(default_provider=s.default_provider, default_model=s.default_model, providers=providers))
+        print(f"{args.provider}: " + (", ".join(args.models) if args.models else "(built-ins)"))
+        return 0
+    if args.config_command == "remove-provider":
+        if providers.pop(args.provider, None) is None:
+            print(f"No provider {args.provider} in settings.")
+            return 0
+        save(Settings(default_provider=s.default_provider, default_model=s.default_model, providers=providers))
+        print(f"Removed provider {args.provider}.")
+        return 0
+    return 0
 
 
 def _cmd_auth(args) -> int:
@@ -152,12 +205,9 @@ def _cmd_models(provider: str | None, cwd: str) -> int:
     """List available models: the curated built-in catalog plus any custom/local models
     from ``~/.pya/models.json`` / ``<cwd>/.pya/models.json``. No network call."""
     from .models_registry import load_model_registry, merge_catalog
-    from .providers.catalog import builtin_models
-    from .settings import load as load_settings
+    from .settings import catalog_models
 
-    settings = load_settings()
-    builtins = settings.model_list() if settings.configured else builtin_models()
-    models = merge_catalog(builtins, load_model_registry(cwd))
+    models = merge_catalog(catalog_models(), load_model_registry(cwd))
     if provider is not None:
         models = [m for m in models if m.provider == provider]
     if not models:
@@ -177,6 +227,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _cmd_models(args.provider, args.cwd)
     if args.command == "auth":
         return _cmd_auth(args)
+    if args.command == "config":
+        return _cmd_config(args)
 
     # Default: one-shot if -p was given, otherwise the interactive REPL.
     from .app import run

@@ -55,3 +55,22 @@ def test_auth_set_list_remove(tmp_path, monkeypatch, capsys):
 
     assert main(["auth", "remove", "openai"]) == 0
     assert oauth.get_api_key("openai") is None
+
+
+def test_config_commands(tmp_path, monkeypatch, capsys):
+    from agent import settings as settings_mod
+
+    monkeypatch.setattr(settings_mod, "SETTINGS_PATH", tmp_path / "settings.toml")
+    assert main(["config", "set-default", "anthropic/claude-opus-4-8"]) == 0
+    assert main(["config", "models", "openai", "gpt-5.1", "gpt-5-codex"]) == 0
+
+    s = settings_mod.load()
+    assert (s.default_provider, s.default_model) == ("anthropic", "claude-opus-4-8")
+    assert s.providers["openai"].models == ("gpt-5.1", "gpt-5-codex")
+
+    capsys.readouterr()
+    assert main(["config", "show"]) == 0
+    assert "openai" in capsys.readouterr().out
+
+    assert main(["config", "remove-provider", "openai"]) == 0
+    assert "openai" not in settings_mod.load().providers

@@ -30,7 +30,6 @@ from .model import open_model
 from .models_registry import ModelRegistry, load_model_registry, merge_catalog
 from .permissions import PermissionMode, Permissions
 from .providers import ProviderError
-from .providers.catalog import builtin_models
 from .render import Renderer, _summarize_args
 from .retry import RetryPolicy
 from .sessions import Session, SessionStore
@@ -66,12 +65,10 @@ def _available_models(registry_models: ModelRegistry | None):
     """The model list for the ``/model`` picker: configured providers' models (from
     ``~/.pya/settings.toml`` when present, else the curated built-ins) + custom models from
     ``.pya/models.json``. No network call — works offline."""
-    from .settings import load as load_settings
+    from .settings import catalog_models
 
     registry_models = registry_models or ModelRegistry()
-    settings = load_settings()
-    builtins = settings.model_list() if settings.configured else builtin_models()
-    return merge_catalog(builtins, registry_models)
+    return merge_catalog(catalog_models(), registry_models)
 
 
 def _make_transform(model, settings: _RunSettings) -> ContextTransform | None:

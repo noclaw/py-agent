@@ -57,6 +57,48 @@ def test_invalid_toml_is_empty(tmp_path):
     assert not s.configured
 
 
+def test_save_roundtrips(tmp_path):
+    path = tmp_path / "out.toml"
+    original = settings_mod.load(_write(tmp_path, SAMPLE))
+    settings_mod.save(original, path)
+    reloaded = settings_mod.load(path)
+    assert (reloaded.default_provider, reloaded.default_model) == ("anthropic", "claude-opus-4-8")
+    assert reloaded.api_key("anthropic") == "sk-ant-test"
+    assert reloaded.providers["anthropic"].models == ("claude-opus-4-8", "claude-sonnet-4-6")
+    assert reloaded.providers["openai"].models == ()
+
+
+def test_catalog_models_scopes_to_configured(tmp_path, monkeypatch):
+    from agent.providers import oauth
+
+    monkeypatch.setattr(settings_mod, "SETTINGS_PATH", _write(tmp_path, SAMPLE))
+    monkeypatch.setattr(oauth, "TOKEN_STORE", tmp_path / "auth.json")
+    rows = settings_mod.catalog_models()
+    providers = {r["provider"] for r in rows}
+    assert providers == {"anthropic", "openai"}  # only configured providers
+    assert [r["id"] for r in rows if r["provider"] == "anthropic"] == ["claude-opus-4-8", "claude-sonnet-4-6"]
+
+
+def test_catalog_models_includes_keyed_provider(tmp_path, monkeypatch):
+    from agent.providers import oauth
+
+    monkeypatch.setattr(settings_mod, "SETTINGS_PATH", tmp_path / "none.toml")  # no settings
+    monkeypatch.setattr(oauth, "TOKEN_STORE", tmp_path / "auth.json")
+    oauth.set_api_key("openai", "sk-x")
+    rows = settings_mod.catalog_models()
+    assert {r["provider"] for r in rows} == {"openai"}  # only the key-stored provider
+    assert any(r["id"] == "gpt-5.1" for r in rows)
+
+
+def test_catalog_models_falls_back_to_all_builtins(tmp_path, monkeypatch):
+    from agent.providers import oauth
+    from agent.providers.catalog import builtin_models
+
+    monkeypatch.setattr(settings_mod, "SETTINGS_PATH", tmp_path / "none.toml")
+    monkeypatch.setattr(oauth, "TOKEN_STORE", tmp_path / "auth.json")
+    assert settings_mod.catalog_models() == builtin_models()
+
+
 def test_resolve_api_key_uses_settings_when_no_env(tmp_path, monkeypatch):
     monkeypatch.setattr(settings_mod, "SETTINGS_PATH", _write(tmp_path, SAMPLE))
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)

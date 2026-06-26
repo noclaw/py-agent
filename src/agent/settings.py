@@ -63,14 +63,17 @@ class Settings:
         cfg = self.providers.get(provider)
         return cfg.api_key if cfg else None
 
-    def model_list(self) -> list[dict[str, str]]:
-        """The ``{provider, id}`` rows to offer: each configured provider's allowlist, or the
-        curated built-ins for that provider when it has no allowlist."""
+    def model_list(self, extra_providers: tuple[str, ...] = ()) -> list[dict[str, str]]:
+        """The ``{provider, id}`` rows to offer for each active provider: its allowlist, or
+        the curated built-ins for that provider when it has none. ``extra_providers`` (e.g.
+        providers that only have a stored key) are included with their built-in subset."""
         from .providers.catalog import BUILTIN_MODELS
 
+        names = list(self.providers) + [p for p in extra_providers if p not in self.providers]
         rows: list[dict[str, str]] = []
-        for name, cfg in self.providers.items():
-            if cfg.models:
+        for name in names:
+            cfg = self.providers.get(name)
+            if cfg and cfg.models:
                 rows.extend({"provider": name, "id": mid} for mid in cfg.models)
             else:
                 rows.extend(bm for bm in BUILTIN_MODELS if bm["provider"] == name)
@@ -99,3 +102,52 @@ def load(path: Path | None = None) -> Settings:
                 models=tuple(str(m) for m in models),
             )
     return Settings(default_provider=dp, default_model=dm, providers=providers)
+
+
+def catalog_models() -> list[dict[str, str]]:
+    """The built-in catalog rows to offer, scoped to the providers in use — those declared in
+    settings and those that have a stored key (``pya auth set``). Falls back to the full
+    curated catalog when nothing is configured."""
+    from .providers import oauth
+    from .providers.catalog import builtin_models
+
+    settings = load()
+    keyed = tuple(p for p, kind in oauth.list_credentials().items() if kind == "api_key")
+    if settings.configured or keyed:
+        return settings.model_list(extra_providers=keyed)
+    return builtin_models()
+
+
+def _toml_str(value: str) -> str:
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def save(settings: Settings, path: Path | None = None) -> None:
+    """Write ``settings`` back to the TOML file (used by ``pya config``).
+
+    Serializes only the schema fields — any comments in a hand-edited file are not preserved.
+    """
+    path = path or _default_path()
+    lines: list[str] = []
+    has_secret = False
+    if settings.default_provider and settings.default_model:
+        lines.append(f'default = "{settings.default_provider}/{settings.default_model}"')
+        lines.append("")
+    for name in sorted(settings.providers):
+        cfg = settings.providers[name]
+        lines.append(f"[providers.{name}]")
+        if cfg.api_key:
+            lines.append(f"api_key = {_toml_str(cfg.api_key)}")
+            has_secret = True
+        if cfg.models:
+            lines.append("models = [" + ", ".join(_toml_str(m) for m in cfg.models) + "]")
+        lines.append("")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+    if has_secret:
+        try:
+            import os
+
+            os.chmod(path, 0o600)
+        except OSError:
+            pass

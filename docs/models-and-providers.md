@@ -43,16 +43,29 @@ models  = ["gpt-5.1", "gpt-5-codex"]
 ```
 
 - **No `export`** — `api_key` is read at runtime.
-- **Only your providers** — when the file lists any `[providers.*]`, `pya models` and the
-  `/model` picker show *only* those (plus any local models from `.pya/models.json`), not the
-  whole built-in catalog.
+- **Only the providers in use** — `pya models` and the `/model` picker show only the
+  providers you've configured here *or* given a key via `pya auth set`, plus any local models
+  from `.pya/models.json`. (With nothing configured, the full curated catalog shows.)
 - **Curated models** — `models = [...]` is exactly what you can pick; omit it to fall back to
   the curated built-ins for that provider.
 
 The `api_key` is keyed by provider name, so it also supplies the key for a local provider
 defined in `.pya/models.json` (keep the key here, the endpoint there). Set
-`PYA_SETTINGS_FILE` to point at a different file. Management commands (`pya auth` / `pya
-config`) are a planned follow-up; for now it's hand-edited.
+`PYA_SETTINGS_FILE` to point at a different file.
+
+You can edit the file by hand, or use **`pya config`** (note: `pya config` rewrites the file,
+so hand-added comments aren't preserved):
+
+```bash
+pya config show
+pya config set-default anthropic/claude-opus-4-8
+pya config models openai gpt-5.1 gpt-5-codex   # set a provider's allowlist (also enables it)
+pya config models groq                          # enable a provider with the curated built-ins
+pya config remove-provider openai
+```
+
+Keys are best stored with `pya auth set` (see [Credentials](#credentials)) rather than in
+this file, so `pya config` never has to touch secrets.
 
 ## Credentials
 

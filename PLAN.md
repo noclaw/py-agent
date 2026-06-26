@@ -123,11 +123,13 @@ The **settings file** (`~/.pya/settings.toml`, `settings.py`) landed for: provid
 (no `export`), scoping which providers/models the catalog offers, a per-provider model
 allowlist, and a `default` model. Credential order: spec key → env var → settings.
 
-`pya auth set/list/remove` manage stored API keys in `~/.pya/auth.json` (chmod 600).
+`pya auth set/list/remove` manage stored API keys in `~/.pya/auth.json` (chmod 600);
+`pya config show/set-default/models/remove-provider` manage the non-secret prefs. The catalog
+is scoped to providers in use (configured *or* key-stored).
 
-Still open: a `pya config` for non-secret prefs; moving permission-mode and retry/compaction
-tuning into settings; inferring `--context-window` per model (the catalog/registry carry
-`contextWindow`) instead of the hard-coded flag.
+Still open: moving permission-mode and retry/compaction tuning into settings; inferring
+`--context-window` per model (the catalog/registry carry `contextWindow`) instead of the
+hard-coded flag.
 
 ### 3. Images / vision
 
