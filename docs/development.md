@@ -19,6 +19,18 @@ Pure-Python dependencies (`httpx`, `pydantic`, `rich`) — the repo is self-cont
 Node. (Reminder: virtualenvs aren't relocatable — if you move/rename the repo directory,
 `rm -rf .venv && uv sync` to rebuild it.)
 
+`uv run pya …` always runs the current source. If you also install the global CLI for
+everyday use, install it **editable** so it tracks your edits:
+
+```bash
+uv tool install --editable . --force      # ~/.local/bin/pya now follows the source
+```
+
+A non-editable `uv tool install .` builds a wheel keyed by version (`0.0.1`); because the
+version rarely changes, re-running it reinstalls the *cached* wheel and your edits don't show
+up. Use the editable install above, or force a rebuild with
+`uv cache clean py-agent && uv tool install . --reinstall`.
+
 ## Tests
 
 ```bash
