@@ -23,6 +23,7 @@ class LsTool(BaseTool):
     )
     parameters = LsArgs
     prompt_snippet = "ls: List directory contents"
+    read_only = True
 
     async def execute(self, args: LsArgs, *, on_update=None) -> ToolResult:
         path = self.resolve(args.path) if args.path else self.cwd

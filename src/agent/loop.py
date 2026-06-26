@@ -277,7 +277,7 @@ async def _execute_tool_calls(
     async def run_one(call: _ToolCallRef) -> ToolResultMessage:
         queue.put_nowait(ToolStart(call.id, call.name, call.arguments))
         async with gate_lock:
-            blocked = await _gate(call, hooks, permissions, approver)
+            blocked = await _gate(call, tools_by_name.get(call.name), hooks, permissions, approver)
         result = blocked if blocked is not None else await _run_single_tool(call, tools_by_name, queue)
         result = await _post_tool_use(call, result, hooks)
         queue.put_nowait(ToolEnd(call.id, call.name, result))
@@ -290,6 +290,7 @@ async def _execute_tool_calls(
 
 async def _gate(
     call: _ToolCallRef,
+    tool: Tool | None,
     hooks: Hooks | None,
     permissions: Permissions | None,
     approver: Approver | None,
@@ -306,7 +307,7 @@ async def _gate(
     if permissions is None:
         return None
 
-    decision = permissions.decide(call.name, call.arguments)
+    decision = permissions.decide(call.name, call.arguments, tool)
     if decision == "deny":
         return ToolResult(content=f"Permission denied for {call.name}.", is_error=True)
     if decision == "ask":

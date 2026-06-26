@@ -23,6 +23,7 @@ class ReadTool(BaseTool):
     )
     parameters = ReadArgs
     prompt_snippet = "read: Read a file's contents"
+    read_only = True
 
     async def execute(self, args: ReadArgs, *, on_update=None) -> ToolResult:
         path = self.resolve(args.path)

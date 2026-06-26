@@ -99,8 +99,14 @@ class WebFetchTool(Tool):
     )
     parameters = WebFetchArgs
     prompt_snippet = "web_fetch: Fetch a URL and read its content"
+    read_only = True
 
-    def __init__(self, *, transport: httpx.BaseTransport | None = None, timeout=_TIMEOUT) -> None:
+    @classmethod
+    def permission_target(cls, args: dict) -> str:
+        return str(args.get("url", ""))
+
+    def __init__(self, cwd: str = ".", *, transport: httpx.BaseTransport | None = None, timeout=_TIMEOUT) -> None:
+        # ``cwd`` is accepted (and ignored) so web tools construct uniformly with file tools.
         self._transport = transport
         self._timeout = timeout
 
@@ -193,8 +199,14 @@ class WebSearchTool(Tool):
     )
     parameters = WebSearchArgs
     prompt_snippet = "web_search: Search the web for information"
+    read_only = True
 
-    def __init__(self, *, transport: httpx.BaseTransport | None = None, timeout=_TIMEOUT) -> None:
+    @classmethod
+    def permission_target(cls, args: dict) -> str:
+        return str(args.get("query", ""))
+
+    def __init__(self, cwd: str = ".", *, transport: httpx.BaseTransport | None = None, timeout=_TIMEOUT) -> None:
+        # ``cwd`` is accepted (and ignored) so web tools construct uniformly with file tools.
         self._transport = transport
         self._timeout = timeout
 

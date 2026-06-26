@@ -27,6 +27,10 @@ class BashTool(BaseTool):
     parameters = BashArgs
     prompt_snippet = "bash: Run a shell command"
 
+    @classmethod
+    def permission_target(cls, args: dict) -> str:
+        return str(args.get("command", ""))
+
     async def execute(self, args: BashArgs, *, on_update=None) -> ToolResult:
         try:
             proc = await asyncio.create_subprocess_shell(

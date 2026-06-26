@@ -19,6 +19,10 @@ Bundles: `coding_tools(cwd)` (the file/shell tools + the two web tools) and
 `read_only_tools(cwd)` (read/grep/find/ls). The `task` tool is added separately via
 `with_task_tool(...)` because it needs a live model — see [below](#sub-agents-the-task-tool).
 
+The built-in set has one source of truth: the ordered `BUILTIN_TOOL_CLASSES` tuple in
+`agent/tools/__init__.py`. `TOOL_CLASSES` (name → class) and `coding_tools()` both derive from
+it, so adding a built-in is a one-line append (and a consistency test guards against drift).
+
 ### Web tools
 
 `web_fetch(url)` GETs a page and reduces HTML to readable text (text/JSON passes through);
@@ -51,6 +55,7 @@ class GreetTool(Tool):
     prompt_snippet = "greet: Greet a person"   # one line for the system prompt's tool list
     prompt_guidelines = ()               # optional extra guideline bullets
     execution_mode = "parallel"          # or "sequential" to force serialized execution
+    read_only = True                     # never mutates the workspace → auto-allowed (default: False)
 
     async def execute(self, args: GreetArgs, *, on_update=None) -> ToolResult:
         text = f"Hello, {args.name}{'!!!' if args.enthusiastic else '.'}"
@@ -61,6 +66,23 @@ class GreetTool(Tool):
 - `content` — text shown to the model.
 - `details` — optional structured data for the renderer (the `edit` tool puts a diff here).
 - `is_error` — marks a failure; the model sees the content and can react.
+
+### Gating: a tool owns its permission policy
+
+A tool declares how it's gated, so [permissions](permissions.md) never needs a hardcoded list
+of tool names:
+
+- **`read_only`** (`ClassVar[bool]`, default `False`) — `True` means the tool never modifies the
+  workspace, so it's auto-allowed without a prompt. Set it on read-only tools (`read`, `grep`,
+  the web tools); leave it `False` on anything that writes, runs commands, or has side effects.
+- **`permission_target(args)`** (classmethod, default `args["path"]`) — the string that a
+  `tool(glob)` rule matches against. Override it when the gated argument isn't `path`: `bash`
+  returns the command (so `bash(git *)` works), the web tools return the URL/query.
+
+That's all — no edit to `permissions.py` is needed to add or gate a tool. The loop passes the
+tool to `Permissions.decide`, which reads these two from the tool itself. (The name-based
+`READ_ONLY_TOOLS`/`MUTATING_TOOLS` sets in `permissions.py` are only a fallback for calling
+`decide` without a tool object, e.g. in tests, and a consistency test keeps them in sync.)
 
 ### Working directory & helpers
 

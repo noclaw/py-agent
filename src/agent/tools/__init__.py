@@ -22,45 +22,41 @@ from .task import TaskTool
 from .web import WebFetchTool, WebSearchTool
 from .write import WriteTool
 
+#: The single ordered source of truth for the built-in tools. Everything below
+#: (``coding_tools``, ``TOOL_CLASSES``, and the per-class ``__all__`` entries) derives from
+#: it, so adding a tool means appending one class here. The order is the presentation order
+#: (read-only first, then mutating, then network) used by ``coding_tools``. Every class must
+#: construct as ``cls(cwd)`` — the web tools accept and ignore ``cwd`` for this reason.
+BUILTIN_TOOL_CLASSES: tuple[type[Tool], ...] = (
+    ReadTool,
+    GrepTool,
+    FindTool,
+    LsTool,
+    BashTool,
+    EditTool,
+    WriteTool,
+    WebFetchTool,
+    WebSearchTool,
+)
+
+#: All built-in tool classes, by name (derived from :data:`BUILTIN_TOOL_CLASSES`).
+TOOL_CLASSES: dict[str, type[Tool]] = {cls.name: cls for cls in BUILTIN_TOOL_CLASSES}
+
 __all__ = [
     "Tool",
-    "ReadTool",
-    "WriteTool",
-    "EditTool",
-    "BashTool",
-    "GrepTool",
-    "FindTool",
-    "LsTool",
+    *(cls.__name__ for cls in BUILTIN_TOOL_CLASSES),
     "TaskTool",
-    "WebFetchTool",
-    "WebSearchTool",
     "coding_tools",
     "read_only_tools",
     "with_task_tool",
+    "BUILTIN_TOOL_CLASSES",
     "TOOL_CLASSES",
 ]
-
-#: All built-in tool classes, by name.
-TOOL_CLASSES: dict[str, type[Tool]] = {
-    cls.name: cls
-    for cls in (ReadTool, WriteTool, EditTool, BashTool, GrepTool, FindTool, LsTool,
-                WebFetchTool, WebSearchTool)
-}
 
 
 def coding_tools(cwd: str | Path = ".") -> list[Tool]:
     """The full built-in tool set, bound to ``cwd`` (plus the network web tools)."""
-    return [
-        ReadTool(cwd),
-        GrepTool(cwd),
-        FindTool(cwd),
-        LsTool(cwd),
-        BashTool(cwd),
-        EditTool(cwd),
-        WriteTool(cwd),
-        WebFetchTool(),
-        WebSearchTool(),
-    ]
+    return [cls(cwd) for cls in BUILTIN_TOOL_CLASSES]
 
 
 def read_only_tools(cwd: str | Path = ".") -> list[Tool]:

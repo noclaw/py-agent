@@ -28,6 +28,7 @@ class FindTool(BaseTool):
     )
     parameters = FindArgs
     prompt_snippet = "find: Find files by glob pattern"
+    read_only = True
 
     async def execute(self, args: FindArgs, *, on_update=None) -> ToolResult:
         base = self.resolve(args.path) if args.path else self.cwd

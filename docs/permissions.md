@@ -39,6 +39,13 @@ Resolution order: **deny rules → mode `bypass` → allow rules → read-only t
 mode's default for mutating tools.** Deny always wins; `decide()` returns `"allow"`,
 `"deny"`, or `"ask"`.
 
+Whether a tool counts as "read-only", and what string its `tool(glob)` rule matches, come
+from the **tool itself** — its `read_only` flag and `permission_target(args)` (see
+[Gating a tool](tools.md#gating-a-tool-owns-its-permission-policy)). The loop passes the tool
+to `decide()`, so adding or gating a tool needs no edit here. The `READ_ONLY_TOOLS` /
+`MUTATING_TOOLS` sets in `permissions.py` are just a name-only fallback for calling `decide()`
+without a tool object.
+
 ## Approval
 
 When the decision is `"ask"`, the loop calls an **approver**. The REPL's approver prompts:

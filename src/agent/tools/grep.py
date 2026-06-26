@@ -35,6 +35,7 @@ class GrepTool(BaseTool):
     )
     parameters = GrepArgs
     prompt_snippet = "grep: Search file contents with a regex"
+    read_only = True
 
     async def execute(self, args: GrepArgs, *, on_update=None) -> ToolResult:
         try:

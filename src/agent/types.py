@@ -223,6 +223,18 @@ class Tool(ABC):
     prompt_guidelines: ClassVar[tuple[str, ...]] = ()
     #: "parallel" (default) or "sequential" — forces serialized execution in a batch.
     execution_mode: ClassVar[str] = "parallel"
+    #: Permission policy (read by :class:`~agent.permissions.Permissions`). A read-only tool
+    #: never mutates the local workspace and is auto-allowed; a mutating tool is gated.
+    read_only: ClassVar[bool] = False
+
+    @classmethod
+    def permission_target(cls, args: dict[str, Any]) -> str:
+        """The string a ``tool(glob)`` permission rule matches against (default: the path).
+
+        Override when the gated argument isn't ``path`` — e.g. ``bash`` returns the command,
+        the web tools return the URL/query. Keeps a tool's gating in its own slice.
+        """
+        return str(args.get("path", ""))
 
     @abstractmethod
     async def execute(
