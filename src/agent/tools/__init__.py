@@ -19,6 +19,7 @@ from .grep import GrepTool
 from .ls import LsTool
 from .read import ReadTool
 from .task import TaskTool
+from .web import WebFetchTool, WebSearchTool
 from .write import WriteTool
 
 __all__ = [
@@ -31,6 +32,8 @@ __all__ = [
     "FindTool",
     "LsTool",
     "TaskTool",
+    "WebFetchTool",
+    "WebSearchTool",
     "coding_tools",
     "read_only_tools",
     "with_task_tool",
@@ -40,12 +43,13 @@ __all__ = [
 #: All built-in tool classes, by name.
 TOOL_CLASSES: dict[str, type[Tool]] = {
     cls.name: cls
-    for cls in (ReadTool, WriteTool, EditTool, BashTool, GrepTool, FindTool, LsTool)
+    for cls in (ReadTool, WriteTool, EditTool, BashTool, GrepTool, FindTool, LsTool,
+                WebFetchTool, WebSearchTool)
 }
 
 
 def coding_tools(cwd: str | Path = ".") -> list[Tool]:
-    """The full built-in tool set, bound to ``cwd``."""
+    """The full built-in tool set, bound to ``cwd`` (plus the network web tools)."""
     return [
         ReadTool(cwd),
         GrepTool(cwd),
@@ -54,6 +58,8 @@ def coding_tools(cwd: str | Path = ".") -> list[Tool]:
         BashTool(cwd),
         EditTool(cwd),
         WriteTool(cwd),
+        WebFetchTool(),
+        WebSearchTool(),
     ]
 
 

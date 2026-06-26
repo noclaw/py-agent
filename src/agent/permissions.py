@@ -33,8 +33,9 @@ class PermissionMode(str, Enum):
     BYPASS = "bypass"  # allow everything (a.k.a. "dangerously skip permissions")
 
 
-#: Tools that never modify anything → always safe to allow.
-READ_ONLY_TOOLS = frozenset({"read", "grep", "find", "ls"})
+#: Tools that never modify the local workspace → allowed without a prompt. (The web tools
+#: do make outbound network requests; a ``deny`` rule can still block them by URL/query.)
+READ_ONLY_TOOLS = frozenset({"read", "grep", "find", "ls", "web_fetch", "web_search"})
 #: Tools that change the world → gated by mode/rules/approval.
 MUTATING_TOOLS = frozenset({"write", "edit", "bash"})
 
@@ -89,6 +90,10 @@ class Permissions:
         """The string a ``tool(glob)`` rule matches against."""
         if tool_name == "bash":
             return str(args.get("command", ""))
+        if tool_name == "web_fetch":
+            return str(args.get("url", ""))
+        if tool_name == "web_search":
+            return str(args.get("query", ""))
         return str(args.get("path", ""))
 
     def _rule_for(self, tool_name: str, args: dict[str, Any]) -> str:

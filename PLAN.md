@@ -84,8 +84,10 @@ Beyond the seven core phases, these optional features are also built:
   HTTP APIs over httpx (`openai-completions` + `anthropic-messages` backends); `wire.py`
   holds the native message/stream types. No Node, no subprocess. Exotic transports
   (Bedrock/Vertex/Azure) are out of scope — add a `Provider`. Design: `PROVIDERS.md`.
+- ✅ **Web tools** — read-only `web_fetch` (URL → readable text) and `web_search` (keyless
+  DuckDuckGo) over httpx, in the default `coding_tools` set. `tools/web.py`.
 
-**Tests:** ~149 unit (scripted fake-model fixture + `httpx.MockTransport`, no network; the
+**Tests:** ~192 unit (scripted fake-model fixture + `httpx.MockTransport`, no network; the
 picker's interactive path runs through a PTY) + a few gated live integration tests
 (`PYA_LIVE_LLM=1` + `ANTHROPIC_API_KEY`).
 
@@ -127,10 +129,11 @@ unification.)
 Read-tool image attachments + passing image content blocks through to the model (both
 provider backends support image input). Mostly plumbing.
 
-### 4. Web tools (`web_fetch` / `web_search`)
+### 4. Web tools (`web_fetch` / `web_search`) ✅ done
 
-Fetch a URL (to markdown) and run a search query, as ordinary `Tool` subclasses. Central to
-assistant/second-brain use cases and an easy, self-contained read for the tools chapter.
+`web_fetch` (URL → readable text via a stdlib HTML→text reducer) and `web_search` (keyless
+DuckDuckGo HTML backend → title/URL/snippet), as ordinary read-only `Tool` subclasses over
+`httpx` (`tools/web.py`), in the default `coding_tools` set. See `docs/tools.md`.
 
 ### 5. Todo / planning tool
 

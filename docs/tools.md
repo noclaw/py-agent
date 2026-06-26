@@ -11,11 +11,22 @@ Tools are how the agent acts. Built-ins live in `src/agent/tools/`:
 | `grep` | regex search across files (skips VCS/build dirs) |
 | `find` | glob for files |
 | `ls` | list a directory |
+| `web_fetch` | fetch a URL and return its readable text (HTML → plain text) |
+| `web_search` | search the web (keyless DuckDuckGo) and return top results |
 | `task` | delegate a focused sub-task to a [sub-agent](#sub-agents-the-task-tool) (opt-in) |
 
-Bundles: `coding_tools(cwd)` (the seven file/shell tools) and `read_only_tools(cwd)`
-(read/grep/find/ls). The `task` tool is added separately via `with_task_tool(...)` because it
-needs a live model — see [below](#sub-agents-the-task-tool).
+Bundles: `coding_tools(cwd)` (the file/shell tools + the two web tools) and
+`read_only_tools(cwd)` (read/grep/find/ls). The `task` tool is added separately via
+`with_task_tool(...)` because it needs a live model — see [below](#sub-agents-the-task-tool).
+
+### Web tools
+
+`web_fetch(url)` GETs a page and reduces HTML to readable text (text/JSON passes through);
+`web_search(query, max_results)` runs a query against a simple **keyless DuckDuckGo HTML**
+backend and returns `title / URL / snippet` rows — swap it for a search API (Brave, Tavily,
+…) in production. Both use `httpx` and are *read-only* (auto-allowed), but they make outbound
+network calls — a `deny` rule can block them by target, e.g.
+`Permissions(deny=["web_fetch(*internal*)"])` (web rules match the `url` / `query`).
 
 ## Anatomy of a tool
 
