@@ -9,19 +9,20 @@ It's meant as an example implementation — small enough to read while learning 
 a clean starting point for personal-assistant / second-brain agents (swap the coding
 toolset for your own).
 
-> **Status:** working end to end — the full tool set (read/write/edit/bash/grep/find/ls),
-> the agent loop, system prompt, interactive CLI/REPL, **permissions**, **hooks**, **slash
-> commands** with custom markdown commands, **skills**, **session** save/resume,
-> **compaction**, **auto-retry**, **sub-agents** (a `task` tool), a **model picker**, and a
-> **native provider layer** (OpenAI-compatible + Anthropic, no Node). Next: memory /
-> second-brain tools. See [`PLAN.md`](PLAN.md).
+> **Status:** working end to end — the full tool set (read/write/edit/bash/grep/find/ls plus
+> **web fetch/search**), the agent loop, system prompt, interactive CLI/REPL,
+> **permissions**, **hooks**, **slash commands** with custom markdown commands, **skills**,
+> **session** save/resume, **compaction**, **auto-retry**, **sub-agents** (a `task` tool), a
+> **model picker**, credential/config management (`pya auth` / `pya config`), and a **native
+> provider layer** (OpenAI-compatible + Anthropic, no Node). Next: memory / second-brain
+> tools. See [`PLAN.md`](PLAN.md).
 
 ## Architecture
 
 ```
 ┌──────────────────────── Python (this repo) ────────────────────────┐
 │  cli / app / render                                                 │
-│  loop  ──calls──>  tools (read/write/edit/bash/grep/find/ls)        │
+│  loop  ──calls──>  tools (read/write/edit/bash/grep/find/ls/web)    │
 │    │                                                                │
 │    │ per turn: stream(context{system, messages, tools})            │
 │    ▼                                                                │
@@ -44,9 +45,10 @@ provider. To support a transport we don't ship, implement the small `Provider` p
 
 - Python ≥ 3.11
 - [`uv`](https://docs.astral.sh/uv/) (recommended) or pip
-- Credentials: a provider API key — an env var (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, …)
-  or `~/.pya/settings.toml` (no `export` needed; also scopes which providers/models the CLI
-  offers). Local servers usually need none.
+- Credentials: a provider API key — an env var (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, …),
+  `pya auth set <provider>` (a managed `~/.pya/auth.json`), or `~/.pya/settings.toml` (no
+  `export` needed; also scopes which providers/models the CLI offers). Local servers usually
+  need none. See [models & providers](docs/models-and-providers.md#credentials).
 
 No Node or other runtime is required — it's pure Python.
 
@@ -151,7 +153,8 @@ In the REPL, `/sessions` lists them and `/resume <id>` loads one (and restores i
 ## Permissions
 
 Mutating tools (`write`/`edit`/`bash`) are gated; read-only tools (`read`/`grep`/`find`/
-`ls`) always run. Modes mirror Claude Code:
+`ls`/`web_fetch`/`web_search`) always run. Each tool declares its own policy, so the gating
+follows the tool, not a hardcoded list. Modes mirror Claude Code:
 
 ```bash
 uv run pya                              # default: ask before each mutating tool
