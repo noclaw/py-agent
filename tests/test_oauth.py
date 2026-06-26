@@ -32,6 +32,30 @@ def store(tmp_path, monkeypatch):
     return path
 
 
+# --- API-key credential store (pya auth) ------------------------------------
+
+
+def test_api_key_store_roundtrip(store):
+    oauth.set_api_key("openai", "sk-123")
+    assert oauth.get_api_key("openai") == "sk-123"
+    assert oauth.list_credentials() == {"openai": "api_key"}
+    assert oauth.clear_token("openai") is True
+    assert oauth.get_api_key("openai") is None
+
+
+def test_get_api_key_ignores_oauth_entries(store):
+    oauth.save_token("demo", {"type": "oauth", "access": "x"})
+    assert oauth.get_api_key("demo") is None  # not an api_key entry
+    assert oauth.list_credentials() == {"demo": "oauth"}
+
+
+def test_store_is_chmod_600(store):
+    import stat
+
+    oauth.set_api_key("openai", "sk")
+    assert stat.S_IMODE(store.stat().st_mode) == 0o600
+
+
 # --- pure helpers -----------------------------------------------------------
 
 

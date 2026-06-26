@@ -56,14 +56,22 @@ config`) are a planned follow-up; for now it's hand-edited.
 
 ## Credentials
 
-Resolution order (per provider):
+Two ways to store a key without exporting it: the **`pya auth`** command (writes a managed
+JSON store), or **`settings.toml`** (hand-edited). Resolution order (per provider):
 
 1. an explicit key in a custom model's `.pya/models.json` spec (`apiKey`),
 2. the provider's environment variable (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, …),
-3. the provider's `api_key` in `~/.pya/settings.toml`.
+3. a key stored by `pya auth set` (`~/.pya/auth.json`, `chmod 600`),
+4. the provider's `api_key` in `~/.pya/settings.toml`.
 
-So a key in `settings.toml` means no `export` is needed, while an env var still overrides it
-(handy in CI).
+So either store means no `export` is needed; an env var still overrides them (handy in CI).
+
+```bash
+pya auth set openai          # prompts (hidden) and stores the key in ~/.pya/auth.json
+pya auth set openai --key sk-...   # non-interactive
+pya auth list                # providers with a stored credential
+pya auth remove openai
+```
 
 Anthropic uses an **API key** (`ANTHROPIC_API_KEY` or `settings.toml`). (Claude Pro/Max OAuth isn't used:
 Anthropic no longer applies subscription credits to standard API usage, so an OAuth

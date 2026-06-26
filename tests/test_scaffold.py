@@ -40,3 +40,18 @@ def test_cli_version_exits_zero(capsys):
         main(["--version"])
     assert exc.value.code == 0
     assert "pya" in capsys.readouterr().out
+
+
+def test_auth_set_list_remove(tmp_path, monkeypatch, capsys):
+    from agent.providers import oauth
+
+    monkeypatch.setattr(oauth, "TOKEN_STORE", tmp_path / "auth.json")
+    assert main(["auth", "set", "openai", "--key", "sk-test-key"]) == 0
+    assert oauth.get_api_key("openai") == "sk-test-key"
+    capsys.readouterr()
+
+    assert main(["auth", "list"]) == 0
+    assert "openai" in capsys.readouterr().out
+
+    assert main(["auth", "remove", "openai"]) == 0
+    assert oauth.get_api_key("openai") is None

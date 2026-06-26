@@ -6,10 +6,9 @@ For the full tour see the [README](README.md); for depth see [`docs/`](docs/READ
 ## 1. Prerequisites
 
 - **Python ≥ 3.11** and [`uv`](https://docs.astral.sh/uv/) (recommended) — or pip. No Node.
-- **Credentials** — a provider API key, via either an env var (`export ANTHROPIC_API_KEY=...`
-  / `export OPENAI_API_KEY=...`) **or** `~/.pya/settings.toml` (so you don't have to export —
-  see [models & providers](docs/models-and-providers.md#settings-pyasettingstoml)). Local
-  OpenAI-compatible servers usually need none. No Node, no `pi`.
+- **Credentials** — a provider API key, via an env var (`export ANTHROPIC_API_KEY=...`),
+  **`pya auth set anthropic`** (stored in `~/.pya/auth.json`), or `~/.pya/settings.toml` — so
+  you don't have to export. Local OpenAI-compatible servers usually need none. No Node, no `pi`.
 
 ## 2. Install
 

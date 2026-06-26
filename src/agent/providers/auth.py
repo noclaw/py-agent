@@ -17,8 +17,9 @@ __all__ = ["resolve_api_key"]
 
 
 def resolve_api_key(route: Route, spec: dict[str, Any] | None, provider: str | None = None) -> str | None:
-    """Resolve the API key: explicit spec ``apiKey`` > the provider's env var > the key in
-    ``~/.pya/settings.toml`` > ``None``. (Env overrides the settings file — handy for CI.)"""
+    """Resolve the API key, in order: explicit spec ``apiKey`` > the provider's env var >
+    the stored key from ``pya auth set`` (``~/.pya/auth.json``) > ``~/.pya/settings.toml`` >
+    ``None``. (Env overrides the stored/file keys — handy for CI.)"""
     if spec and spec.get("apiKey"):
         return str(spec["apiKey"])
     if route.env_var:
@@ -26,6 +27,12 @@ def resolve_api_key(route: Route, spec: dict[str, Any] | None, provider: str | N
         if key:
             return key
     if provider:
+        from . import oauth
+
+        stored = oauth.get_api_key(provider)
+        if stored:
+            return stored
+
         from ..settings import load
 
         key = load().api_key(provider)

@@ -76,3 +76,18 @@ def test_spec_key_wins_over_everything(tmp_path, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-env")
     route = KNOWN_PROVIDERS["anthropic"]
     assert auth.resolve_api_key(route, {"apiKey": "sk-spec"}, provider="anthropic") == "sk-spec"
+
+
+def test_stored_key_beats_settings_but_env_beats_stored(tmp_path, monkeypatch):
+    from agent.providers import oauth
+
+    monkeypatch.setattr(settings_mod, "SETTINGS_PATH", _write(tmp_path, SAMPLE))  # settings: sk-ant-test
+    monkeypatch.setattr(oauth, "TOKEN_STORE", tmp_path / "auth.json")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    oauth.set_api_key("anthropic", "sk-stored")
+    route = KNOWN_PROVIDERS["anthropic"]
+    # `pya auth set` (auth.json) beats the hand-edited settings.toml key…
+    assert auth.resolve_api_key(route, None, provider="anthropic") == "sk-stored"
+    # …but an env var still overrides everything below the spec key.
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-env")
+    assert auth.resolve_api_key(route, None, provider="anthropic") == "sk-env"

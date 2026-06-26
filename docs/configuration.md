@@ -53,8 +53,9 @@ Sessions live under `~/.pya/sessions/` (or `PYA_SESSIONS_DIR`). User-level only:
 
 ```
 ~/.pya/
-  settings.toml              # provider keys, enabled providers, model allowlist, default
-                             #   (chmod 600 — holds API keys; see models-and-providers.md)
+  settings.toml              # enabled providers, model allowlist, default, (optional keys)
+                             #   (chmod 600 if you put keys here; see models-and-providers.md)
+  auth.json                  # keys stored by `pya auth set` (managed, chmod 600)
 ```
 
 ## Project context

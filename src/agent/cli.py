@@ -111,7 +111,41 @@ def _build_parser() -> argparse.ArgumentParser:
     p_models = sub.add_parser("models", help="List available models (built-ins + custom).")
     p_models.add_argument("--provider", default=None, help="Filter to one provider.")
 
+    p_auth = sub.add_parser("auth", help="Manage stored provider API keys (~/.pya/auth.json).")
+    auth_sub = p_auth.add_subparsers(dest="auth_command")
+    p_set = auth_sub.add_parser("set", help="Store an API key for a provider (prompts if --key omitted).")
+    p_set.add_argument("provider", help="Provider id, e.g. anthropic or openai.")
+    p_set.add_argument("--key", default=None, help="The key (omit to be prompted, hidden).")
+    auth_sub.add_parser("list", help="List providers with a stored credential.")
+    p_rm = auth_sub.add_parser("remove", help="Remove a provider's stored credential.")
+    p_rm.add_argument("provider")
+
     return parser
+
+
+def _cmd_auth(args) -> int:
+    import getpass
+
+    from .providers import oauth
+
+    if args.auth_command == "set":
+        key = args.key or getpass.getpass(f"API key for {args.provider}: ").strip()
+        if not key:
+            print("[error] no key provided", file=sys.stderr)
+            return 1
+        oauth.set_api_key(args.provider, key)
+        print(f"Stored key for {args.provider} (…{key[-4:]}) in ~/.pya/auth.json")
+        return 0
+    if args.auth_command == "remove":
+        print(f"Removed {args.provider}." if oauth.clear_token(args.provider) else f"No stored credential for {args.provider}.")
+        return 0
+    # default / "list"
+    creds = oauth.list_credentials()
+    if not creds:
+        print("(no stored credentials)")
+    for provider, kind in sorted(creds.items()):
+        print(f"{provider:16} {kind}")
+    return 0
 
 
 def _cmd_models(provider: str | None, cwd: str) -> int:
@@ -141,6 +175,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.command == "models":
         return _cmd_models(args.provider, args.cwd)
+    if args.command == "auth":
+        return _cmd_auth(args)
 
     # Default: one-shot if -p was given, otherwise the interactive REPL.
     from .app import run

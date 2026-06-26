@@ -1,10 +1,12 @@
-"""Generic OAuth 2.0 (authorization-code + PKCE) toolkit for the provider layer.
+"""The credential store (``~/.pya/auth.json``) + a generic OAuth (auth-code + PKCE) toolkit.
 
-Reusable building blocks for adding an OAuth-authenticated provider — e.g. an
-OpenAI-compatible service that logs in via OAuth. **Provider-neutral and not wired to
-anything today**: a provider supplies an :class:`OAuthConfig`, and this module runs the
-PKCE flow (local callback server or manual paste), exchanges/refreshes tokens, and stores
-them per-provider in ``~/.pya/auth.json``.
+This module owns ``~/.pya/auth.json`` (``chmod 600``), a per-provider store holding either a
+plain **API key** (written by ``pya auth set`` — :func:`set_api_key` / :func:`get_api_key`)
+or an **OAuth token**. :func:`agent.providers.auth.resolve_api_key` reads the API keys here.
+
+The OAuth half is **provider-neutral and not wired to anything today**: a provider supplies
+an :class:`OAuthConfig`, and the toolkit runs the PKCE flow (local callback server or manual
+paste), exchanges/refreshes tokens, and persists them in the same store.
 
 History: this began as the Anthropic Pro/Max login. That was removed once Anthropic stopped
 applying subscription credits to standard API usage (an API key is the right Anthropic
@@ -18,6 +20,7 @@ import base64
 import hashlib
 import http.server
 import json
+import os
 import secrets
 import threading
 import time
@@ -42,11 +45,16 @@ __all__ = [
     "read_token",
     "save_token",
     "clear_token",
+    "set_api_key",
+    "get_api_key",
+    "list_credentials",
     "current_access_token",
     "TOKEN_STORE",
 ]
 
-#: Per-provider OAuth token store: ``{"<provider>": {type, access, refresh, expires}}``.
+#: Per-provider credential store (``chmod 600``): ``{"<provider>": {...}}`` where each entry
+#: is an API key (``{type: "api_key", key}``) or an OAuth token (``{type: "oauth", access,
+#: refresh, expires}``). This module owns the file; ``pya auth`` and the OAuth flow write here.
 TOKEN_STORE = Path.home() / ".pya" / "auth.json"
 
 _SKEW_MS = 60_000
@@ -89,21 +97,47 @@ def read_token(provider: str) -> dict[str, Any] | None:
     return cred if isinstance(cred, dict) else None
 
 
+def _write_store(store: dict[str, Any]) -> None:
+    TOKEN_STORE.parent.mkdir(parents=True, exist_ok=True)
+    TOKEN_STORE.write_text(json.dumps(store, indent=2), encoding="utf-8")
+    try:
+        os.chmod(TOKEN_STORE, 0o600)  # it holds secrets
+    except OSError:
+        pass
+
+
 def save_token(provider: str, cred: dict[str, Any]) -> None:
     store = _read_store()
     store[provider] = cred
-    TOKEN_STORE.parent.mkdir(parents=True, exist_ok=True)
-    TOKEN_STORE.write_text(json.dumps(store, indent=2), encoding="utf-8")
+    _write_store(store)
 
 
 def clear_token(provider: str) -> bool:
-    """Remove a provider's stored token. Returns whether one existed."""
+    """Remove a provider's stored credential. Returns whether one existed."""
     store = _read_store()
     if provider not in store:
         return False
     del store[provider]
-    TOKEN_STORE.write_text(json.dumps(store, indent=2), encoding="utf-8")
+    _write_store(store)
     return True
+
+
+def set_api_key(provider: str, key: str) -> None:
+    """Store an API key for ``provider`` (used by ``pya auth set``)."""
+    save_token(provider, {"type": "api_key", "key": key})
+
+
+def get_api_key(provider: str) -> str | None:
+    """The stored API key for ``provider``, or ``None`` (ignores OAuth-token entries)."""
+    cred = read_token(provider)
+    if cred and cred.get("type") == "api_key":
+        return cred.get("key")
+    return None
+
+
+def list_credentials() -> dict[str, str]:
+    """Map of provider -> credential type for everything in the store."""
+    return {p: str(c.get("type", "?")) for p, c in _read_store().items() if isinstance(c, dict)}
 
 
 # --- token endpoint ---------------------------------------------------------
