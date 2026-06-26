@@ -33,8 +33,11 @@ the one place in-memory messages become the dicts the model sees. See `agent/typ
 
 ## The model adapter
 
-The only thing that leaves your process is the model call. `open_model()` hands you a
-`Model` whose `.stream(...)` yields events as the response arrives:
+The model is your agent's one external dependency: each turn you send the conversation over
+the network and stream back the reply. In py-agent that call is **native Python** — the
+provider layer (`agent/providers/`) speaks the provider's HTTP API directly over `httpx`, in
+your own process. No subprocess, no SDK, no shim. `open_model()` hands you a `Model` whose
+`.stream(...)` yields events as the response arrives:
 
 ```python
 from agent.model import open_model
@@ -49,6 +52,26 @@ The stream **terminates** with a `done` or `error` event whose `.final_message` 
 complete `AssistantMessage` for the turn. The loop's job is to notice that final message,
 check whether it contains tool calls, and decide whether to go around again. See
 `agent/model.py` and [models & providers](../models-and-providers.md).
+
+### Picking the provider and model
+
+`open_model` is provider-agnostic: the rest of the loop never knows which model answered.
+You choose with just two strings — `provider` and `model`:
+
+```python
+open_model(provider="anthropic", model="claude-opus-4-8")   # Claude (anthropic-messages API)
+open_model(provider="openai",    model="gpt-5.1")           # OpenAI (openai-completions API)
+open_model(provider="local",     model="qwen3")             # a local OpenAI-compatible server
+```
+
+`agent/model.py` resolves the pair to a *provider* (which HTTP API + base URL) and a
+*credential*, then routes to the matching backend — `openai-completions` (OpenAI and any
+OpenAI-compatible server: Ollama, LM Studio, vLLM, Groq, Together, …) or
+`anthropic-messages` (Claude). So pointing the agent at a different model — even a local one
+with no API key — is a one-line change here; nothing in the loop, tools, or history moves.
+The `local` example needs a `.pya/models.json` entry naming its `baseUrl`; the full setup
+(credentials, the `/model` picker, custom models) is in
+[models & providers](../models-and-providers.md).
 
 ## The loop, by hand
 
@@ -129,10 +152,11 @@ rewrites).
 
 ## Anatomy recap
 
-You touched three of the five parts: the **model adapter** (one streamed call out of
-process), the **loop** (stream → run tools → feed back → repeat), and **context/history**
-(the message list + `to_llm_messages`). Tools were along for the ride — next we build one
-properly and learn how to keep it from doing something you didn't want.
+You touched three of the five parts: the **model adapter** (one streamed HTTP call to the
+provider, chosen by `provider`/`model`), the **loop** (stream → run tools → feed back →
+repeat), and **context/history** (the message list + `to_llm_messages`). Tools were along for
+the ride — next we build one properly and learn how to keep it from doing something you
+didn't want.
 
 **Next:** [Adding tools you can trust →](02-tools.md)
 Reference: [the agent loop](../agent-loop.md) · `agent/loop.py`, `agent/types.py`, `agent/model.py`

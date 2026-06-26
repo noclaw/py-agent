@@ -64,6 +64,11 @@ export OPENAI_API_KEY=sk-...
 OpenAI-compatible providers (`groq`, `together`, `openrouter`, …) follow the same
 env-var pattern. `pya models` lists the curated built-ins plus your custom models.
 
+To avoid `export`ing at all, store the key once with **`pya auth set <provider>`** (a managed
+`~/.pya/auth.json`) or in `~/.pya/settings.toml` — both are read at runtime, and an env var
+still overrides them. The full resolution order and how to scope which providers/models the
+CLI offers is in [models & providers](models-and-providers.md#credentials).
+
 ## Select a model
 
 ```bash

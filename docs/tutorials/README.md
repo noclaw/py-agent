@@ -14,7 +14,8 @@ Strip away the features and every coding agent — py-agent, Claude Code — is 
 five pieces. We'll name them once here and tag each tutorial with the parts it touches:
 
 1. **Model adapter** — turns "a conversation + some tools" into a streamed model response.
-   One out-of-process call; everything else is yours. (`agent/model.py`)
+   One HTTP call to the provider (native `httpx`, in-process); everything else is your
+   code. Swappable across providers and models. (`agent/model.py`)
 2. **The loop** — stream a turn, run the tools the model asked for, feed results back,
    repeat until it stops. (`agent/loop.py`)
 3. **Tools** — typed functions the model can call; each returns text the model reads next

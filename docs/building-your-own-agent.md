@@ -79,6 +79,7 @@ class RecallTool(Tool):
     description = "Search the user's saved notes."
     parameters = RecallArgs
     prompt_snippet = "recall: Search saved notes"
+    read_only = True   # only reads → auto-allowed (note writes, so it stays gated)
 
     async def execute(self, args, *, on_update=None) -> ToolResult:
         if not NOTES.exists():

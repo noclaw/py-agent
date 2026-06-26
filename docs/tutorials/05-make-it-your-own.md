@@ -97,11 +97,12 @@ fit. An assistant probably wants:
 
 - **Sessions** so it remembers across runs (it's the same JSONL persistence).
 - **Compaction** for long-running chats (same `transform_context` seam).
-- **Permissions** tuned to *your* tools — `note`/`recall` are read-ish and safe to allow;
-  a `send_email` tool should be `"ask"`. Add it to the gated set rather than the read-only
-  one. (Note the built-in `READ_ONLY_TOOLS`/`MUTATING_TOOLS` sets name the *coding* tools;
-  for a custom toolset, set `Permissions(read_only=frozenset({"note", "recall"}))` so your
-  safe tools never prompt and the rest are gated.)
+- **Permissions** tuned to *your* tools — each tool declares its own gating, so a custom
+  toolset needs no change to `permissions.py`. `recall` only reads, so set `read_only = True`
+  on its class and it's auto-allowed; `note` and a `send_email` tool leave the default
+  (`read_only = False`) and are gated, asked before they run. (If the gated argument isn't
+  `path`, override `permission_target` so rules like `send_email(*@work.com)` match the right
+  field — see [tools › gating](../tools.md#gating-a-tool-owns-its-permission-policy).)
 - **Sub-agents** if a request fans out ("summarize all my notes from last week").
 
 Nothing here is new machinery — it's the same seams pointed at different tools.
@@ -125,8 +126,8 @@ next steps:
 - Add a real data source — a tool that calls an HTTP API, a database, your calendar.
 - Write a **skill** ([skills](../skills.md)) so the model learns a workflow from markdown
   instead of code.
-- Read `PLAN.md` for the roadmap (memory tools, a model registry, images, web tools, MCP)
-  — and consider which seam each would attach to.
+- Read `PLAN.md` for the roadmap (memory tools, images, MCP) — and consider which seam each
+  would attach to.
 
 ## Anatomy recap
 
