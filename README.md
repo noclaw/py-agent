@@ -34,6 +34,9 @@ toolset for your own).
 Only the LLM call crosses into Node; the loop and tools stay in readable Python. See
 `PLAN.md` for the pi-agent-core vs pi-coding-agent module map this port follows.
 
+> **In a hurry?** The [QUICKSTART](QUICKSTART.md) gets you from zero to a first turn —
+> install, credentials, pick a model. This README is the fuller tour.
+
 ## Requirements
 
 - Python ≥ 3.11
@@ -54,6 +57,13 @@ uv sync --extra dev
 This pulls `pi-py-sdk` from PyPI, so the repo is self-contained. (To develop against a
 local pi-py checkout instead, add `[tool.uv.sources]` → `pi-py-sdk = { path = "../pi-py",
 editable = true }` to `pyproject.toml`.)
+
+To run `pya` from anywhere (not just `uv run` inside the repo), install the CLI:
+
+```bash
+uv tool install .       # or: pipx install .
+pya --version
+```
 
 ## Try it
 

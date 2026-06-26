@@ -12,9 +12,15 @@ to install and run.
   local models, switching models.
 
 ## Use it
-- [Getting started](getting-started.md) — install, credentials, first run.
-- [Configuration](configuration.md) — env vars and the `.pya/` directory layout.
+- [Quickstart](../QUICKSTART.md) — zero to a first turn in a few minutes.
+- [Getting started](getting-started.md) — install (incl. global `pya`), configure a
+  provider, select a model, troubleshooting.
+- [Configuration](configuration.md) — flags, env vars, and the `.pya/` directory layout.
 - [Sessions](sessions.md) — save and resume conversations.
+
+## Learn it
+- [Tutorials](tutorials/README.md) — build up how an agent works, part by part, mapped to
+  the code in this repo.
 
 ## Extend it (the seams)
 - [Tools](tools.md) — write a custom tool.

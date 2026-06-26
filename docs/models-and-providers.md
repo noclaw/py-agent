@@ -36,12 +36,51 @@ support it. Thinking is streamed and rendered dimmed.
 
 ## Local & custom models
 
-`pi-ai` reaches local runtimes (Ollama, LM Studio, …) and custom endpoints by treating
-them as a `Model` with a `baseUrl` and an API flavor (usually OpenAI-completions). Pi
-configures these in a `models.json`; surfacing the same in py-agent (a small model
-registry) is a planned enhancement — see `PLAN.md` ("models & providers"). Until then, the
-simplest path for a local model is to configure it in your `pi` install (which the shim
-reads) and select it with `--provider/--model`.
+`pi-ai` reaches local runtimes (Ollama, LM Studio, vLLM, …) and any OpenAI-compatible
+endpoint by treating them as a `Model` with a `baseUrl` and an API flavor (usually
+`openai-completions`) rather than a catalog entry.
+
+**What `pya` selects today.** The `pya` CLI (and `pya models`) only sees `pi-ai`'s
+*built-in* catalog — `--provider`/`--model` look an id up there. A custom provider you've
+added to your `pi` install's `~/.pi/agent/models.json` is **not** enumerated by `pya
+models` and isn't selectable by id from the CLI yet. Surfacing a model registry in py-agent
+(reading a `models.json` so `--model` can name a local model) is a planned enhancement —
+see `PLAN.md` ("models & providers").
+
+**What works now: a full model spec, programmatically.** The underlying
+`PiModelClient.stream` accepts a complete model object instead of a provider/model id, so
+you can point it at a local endpoint directly:
+
+```python
+import asyncio
+from pi_py_sdk import PiModelClient
+
+LOCAL = {
+    "id": "qwen3", "name": "qwen3", "provider": "local",
+    "api": "openai-completions",
+    "baseUrl": "http://127.0.0.1:8008/v1",
+    "apiKey": "...",               # whatever your server expects
+    "contextWindow": 32768, "maxTokens": 32768,
+    "reasoning": False, "input": ["text"],
+}
+
+async def main():
+    async with PiModelClient() as client:
+        async for ev in client.stream(
+            model=LOCAL,            # full spec, not an id
+            messages=[{"role": "user", "content": "hello", "timestamp": 0}],
+        ):
+            if ev.type == "text_delta":
+                print(ev.delta, end="", flush=True)
+
+asyncio.run(main())
+```
+
+py-agent's own `agent/model.py` wrapper currently types `model` as a string, so to drive
+the *agent loop* against a local model today you'd extend `Model`/`open_model` to pass the
+spec through — the seam is already there (`stream` forwards `model` to the client). That
+small registry is the planned work above. A local server's key goes in the spec's
+`apiKey`; built-in providers still resolve via env var or `~/.pi/agent` OAuth as above.
 
 ## Under the hood
 
