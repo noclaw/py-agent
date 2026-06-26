@@ -45,10 +45,10 @@ provider. To support a transport we don't ship, implement the small `Provider` p
 - Python ≥ 3.11
 - [`uv`](https://docs.astral.sh/uv/) (recommended) or pip
 - Credentials: a provider env var (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, …) **or**, for
-  Claude Pro/Max, an existing OAuth login at `~/.pi/agent/auth.json` (run `pi`, then
-  `/login` once — `pi`/Node are only needed for that login, not at runtime).
+  Claude Pro/Max, `pya login` (a native OAuth browser flow — token stored in
+  `~/.pya/auth.json`, no Node).
 
-No Node and no `pi` install are required to run the agent.
+No Node and no `pi` install are required — anywhere.
 
 ## Setup
 

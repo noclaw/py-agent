@@ -9,8 +9,8 @@ For the full tour see the [README](README.md); for depth see [`docs/`](docs/READ
 - **Credentials** — either of:
   - a provider API key in your environment (e.g. `export ANTHROPIC_API_KEY=...` or
     `export OPENAI_API_KEY=...`), **or**
-  - for Claude Pro/Max, an OAuth login at `~/.pi/agent/auth.json` (run `pi`, then `/login`
-    once — that's the only thing that needs Node, and only for the login, not at runtime).
+  - for Claude Pro/Max, run **`pya login`** — a native OAuth browser flow (token saved to
+    `~/.pya/auth.json`; `pya logout` clears it). No Node, no `pi`.
 
 ## 2. Install
 

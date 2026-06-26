@@ -10,9 +10,8 @@ for everyday use.
 - Credentials (either one):
   - a provider API key in the environment, e.g. `export ANTHROPIC_API_KEY=...` /
     `export OPENAI_API_KEY=...`, or
-  - for Claude Pro/Max, an OAuth login at `~/.pi/agent/auth.json` (run `pi`, then `/login`
-    once — Node is only needed for that login step). py-agent reads/refreshes the token
-    automatically.
+  - for Claude Pro/Max, run **`pya login`** — a native OAuth browser flow (token saved to
+    `~/.pya/auth.json`, refreshed automatically; `pya logout` clears it). No Node, no `pi`.
 
 The model layer is native Python (httpx) talking directly to provider HTTP APIs —
 OpenAI-compatible (OpenAI + local servers) and Anthropic. See
@@ -64,8 +63,8 @@ export ANTHROPIC_API_KEY=sk-ant-...
 # OpenAI
 export OPENAI_API_KEY=sk-...
 
-# …or, for Claude Pro/Max, reuse an OAuth login (no env var needed)
-pi          # then type /login once; py-agent reads/refreshes the token automatically
+# …or, for Claude Pro/Max, log in via OAuth (no env var needed)
+pya login   # native browser flow; pya logout clears it; token in ~/.pya/auth.json
 ```
 
 OpenAI-compatible providers (`groq`, `together`, `openrouter`, …) follow the same

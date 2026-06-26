@@ -30,12 +30,14 @@ Resolution order (per provider):
 1. an explicit key in a custom model's `.pya/models.json` spec (`apiKey`),
 2. the provider's environment variable (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
    `GROQ_API_KEY`, …),
-3. for Anthropic only: a Claude **Pro/Max OAuth login** in `~/.pi/agent/auth.json` (via
-   `pi` → `/login`). `agent/providers/oauth.py` reads it and refreshes the token
-   automatically — the bearer token is sent with the `anthropic-beta: oauth-2025-04-20`
-   header.
+3. for Anthropic only: a Claude **Pro/Max OAuth login**. Run **`pya login`** — a native
+   PKCE browser flow (a local callback on `127.0.0.1:53692`, or `pya login --manual` to
+   paste the redirect URL) that stores the token in `~/.pya/auth.json`; `pya logout` clears
+   it. `agent/providers/oauth.py` reads and auto-refreshes it, sending the bearer token with
+   the `anthropic-beta: oauth-2025-04-20` header. An existing `pi` login
+   (`~/.pi/agent/auth.json`) is also read as a fallback.
 
-So if you already logged into Claude Pro/Max with `pi`, Anthropic works with no env var.
+So `pya login` once and Anthropic works with no env var — no Node, no `pi`.
 
 ## Reasoning / thinking
 
