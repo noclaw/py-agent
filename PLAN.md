@@ -80,14 +80,21 @@ Beyond the seven core phases, these optional features are also built:
 - ✅ **Model registry + selection** — custom/local models via `.pya/models.json`
   (`models_registry.py`), selectable by `--model`/`/model` and listed by `pya models`;
   `/model` with no arg opens a dependency-free fuzzy picker (`picker.py`).
+- ✅ **Settings file** — `~/.pya/settings.toml` (`settings.py`): provider API keys (no
+  `export`), provider/model scoping + allowlist, a `default` model, and runtime defaults
+  (reasoning/permission_mode/max_retries/context_window/compact/subagent). Managed by
+  `pya auth set/list/remove` and `pya config show/set/unset/…`.
 - ✅ **Native provider layer** (`agent/providers/`) — model calls go directly to provider
   HTTP APIs over httpx (`openai-completions` + `anthropic-messages` backends); `wire.py`
   holds the native message/stream types. No Node, no subprocess. Exotic transports
   (Bedrock/Vertex/Azure) are out of scope — add a `Provider`. Design: `PROVIDERS.md`.
 - ✅ **Web tools** — read-only `web_fetch` (URL → readable text) and `web_search` (keyless
   DuckDuckGo) over httpx, in the default `coding_tools` set. `tools/web.py`.
+- ✅ **Edit checkpoints / undo** — snapshot a file's bytes before each successful
+  `write`/`edit` (via `PreToolUse`/`PostToolUse` hooks); `/checkpoints` lists them and
+  `/rewind [N]` restores the working tree. `checkpoints.py`.
 
-**Tests:** ~192 unit (scripted fake-model fixture + `httpx.MockTransport`, no network; the
+**Tests:** ~199 unit (scripted fake-model fixture + `httpx.MockTransport`, no network; the
 picker's interactive path runs through a PTY) + a few gated live integration tests
 (`PYA_LIVE_LLM=1` + `ANTHROPIC_API_KEY`).
 
@@ -107,64 +114,35 @@ files or sqlite). Demonstrates swapping the coding toolset for an assistant tool
 same registry — directly serves goal (b). Good companion to
 [`docs/building-your-own-agent.md`](docs/building-your-own-agent.md).
 
-### 2. Settings file + model registry ✅ done
-
-The **model registry** — custom/local models in `.pya/models.json`, selectable from the CLI
-and the `/model` picker (`models_registry.py`, `picker.py`).
-
-The **settings file** (`~/.pya/settings.toml`, `settings.py`): provider API keys (no
-`export`), provider/model scoping + allowlist, a `default` model, and runtime defaults
-(`reasoning`, `permission_mode`, `max_retries`, `context_window`, `compact`, `subagent`).
-Resolution is CLI flag → settings → built-in default; `context_window` is inferred per model
-from catalog/registry metadata when unset. Credential order: spec key → env → `pya auth set`
-(`~/.pya/auth.json`, chmod 600) → settings.
-
-Commands: `pya auth set/list/remove`; `pya config show/set/unset/set-default/models/remove-provider`.
-
-(Optional later: project-level `.pya/settings.toml` overrides; a `models.json`-vs-settings
-unification.)
-
-### 3. Images / vision
+### 2. Images / vision
 
 Read-tool image attachments + passing image content blocks through to the model (both
 provider backends support image input). Mostly plumbing.
 
-### 4. Web tools (`web_fetch` / `web_search`) ✅ done
-
-`web_fetch` (URL → readable text via a stdlib HTML→text reducer) and `web_search` (keyless
-DuckDuckGo HTML backend → title/URL/snippet), as ordinary read-only `Tool` subclasses over
-`httpx` (`tools/web.py`), in the default `coding_tools` set. See `docs/tools.md`.
-
-### 5. Todo / planning tool
+### 3. Todo / planning tool
 
 A `todo` tool (Claude Code's `TodoWrite` shape) the agent uses to track a multi-step plan,
 rendered as a checklist. Improves long-task behavior and demonstrates a tool that mutates
 *shared run state* rather than the filesystem.
 
-### 6. Token / cost budget
+### 4. Token / cost budget
 
 Enforce a per-run ceiling on tokens (or estimated cost) using the `usage` the renderer
 already accumulates: warn near the limit, stop cleanly when exceeded. Pairs with compaction
 (`--context-window`) and gives long autonomous runs a guardrail.
 
-### 7. MCP tool servers
+### 5. MCP tool servers
 
 Expose external [MCP](https://modelcontextprotocol.io) tools through the same `Tool`
 protocol (an adapter that lists remote tools and proxies `execute`). Powerful but heavier
 than skills, and less central to the learning/second-brain goals.
 
-### 8. Edit checkpoints / undo
-
-Snapshot file state before each `write`/`edit` (a shadow copy or a scratch git stash) so a
-session can rewind, à la Claude Code's checkpoint/rewind. Pairs with sessions and makes
-`--yolo` runs safer to experiment with.
-
-### 9. Persistent permission rules
+### 6. Persistent permission rules
 
 Save the allow/deny rules built up via the "always" approval to `.pya/` so they carry across
 sessions, instead of living only in memory for the current run (`permissions.py`).
 
-### 10. Polish
+### 7. Polish
 
 Richer TUI (`textual`/`prompt_toolkit`), HTML/markdown transcript export, themes, and
 persisting a `compaction` entry into the session JSONL so resumed runs keep the summary.

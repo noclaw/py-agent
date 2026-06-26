@@ -39,7 +39,8 @@ src/agent/
   skills.py         # progressive-disclosure SKILL.md discovery + prompt block
   compaction.py     # context compaction (transform_context seam)
   retry.py          # RetryPolicy for transient model errors
-  tools/            # read/write/edit/bash/grep/find/ls + task (sub-agent)
+  checkpoints.py    # file-edit snapshots for /checkpoints and /rewind
+  tools/            # read/write/edit/bash/grep/find/ls + web + task (sub-agent)
 tests/              # pytest; unit tests use a fake model (no network)
 docs/               # design + usage guides (start at docs/README.md)
 PLAN.md             # status + Potential Features roadmap

@@ -110,6 +110,33 @@ def test_model_picker_cancel_leaves_unchanged(monkeypatch):
     assert "unchanged" in buf.getvalue()
 
 
+def test_checkpoints_and_rewind(tmp_path):
+    from agent.checkpoints import Checkpoints
+
+    f = tmp_path / "f.txt"
+    f.write_text("v1")
+    cps = Checkpoints()
+    cps.stash("c1", "edit", f)
+    cps.commit("c1", success=True)
+    f.write_text("v2")  # the simulated edit
+
+    ctx, buf, registry = _ctx(cwd=str(tmp_path))
+    ctx.checkpoints = cps
+
+    registry.dispatch("/checkpoints", ctx)
+    out = buf.getvalue()
+    assert "checkpoints (1)" in out and "f.txt" in out
+
+    registry.dispatch("/rewind", ctx)  # no arg → undo last
+    assert f.read_text() == "v1" and len(cps) == 0
+
+
+def test_rewind_with_no_checkpoints():
+    ctx, buf, registry = _ctx()
+    registry.dispatch("/rewind", ctx)
+    assert "nothing to rewind" in buf.getvalue()
+
+
 def test_mode_change_and_invalid():
     ctx, buf, registry = _ctx()
     registry.dispatch("/mode plan", ctx)

@@ -90,6 +90,8 @@ In the REPL, lines starting with `/` are commands. Built-ins:
 | `/mode <mode>` | show or set the permission mode |
 | `/sessions` | list saved sessions for this directory |
 | `/resume <id>` | resume a saved session |
+| `/checkpoints` | list file-edit checkpoints (undo points) |
+| `/rewind [N]` | restore files to a checkpoint (no arg = undo the last) |
 | `/skills` | list available skills (see below) |
 | `/exit`, `/quit` | leave |
 

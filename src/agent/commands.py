@@ -26,6 +26,7 @@ from .skills import Skill, discover_skills
 from .types import AgentMessage, Tool
 
 if TYPE_CHECKING:
+    from .checkpoints import Checkpoints
     from .model import Model
     from .sessions import Session, SessionStore
 
@@ -54,6 +55,8 @@ class CommandContext:
     cwd: str = "."
     #: Available models (built-in + custom) for the ``/model`` picker; empty until prefetched.
     models: list[ModelInfo] = field(default_factory=list)
+    #: File-edit checkpoints for ``/checkpoints`` and ``/rewind`` (None = not tracked).
+    checkpoints: "Checkpoints | None" = None
 
 
 @dataclass
@@ -225,6 +228,48 @@ def _cmd_mode(ctx: CommandContext, args: str) -> CommandOutcome:
     return CommandOutcome()
 
 
+def _cmd_checkpoints(ctx: CommandContext, args: str) -> CommandOutcome:
+    cps = ctx.checkpoints
+    if cps is None:
+        ctx.console.print("[dim]checkpoints aren't tracked here[/dim]")
+        return CommandOutcome()
+    items = cps.list()
+    if not items:
+        ctx.console.print("[dim]no checkpoints yet — edit or write a file first[/dim]")
+        return CommandOutcome()
+    ctx.console.print(f"[bold]checkpoints ({len(items)})[/bold]")
+    for cp in items:
+        tag = " [dim](new file)[/dim]" if cp.created else ""
+        ctx.console.print(f"  [cyan]{cp.seq}[/cyan]  {cp.tool:<5} {cp.display(Path(ctx.cwd))}{tag}")
+    ctx.console.print("[dim]/rewind [N] to restore (no N = undo the last)[/dim]")
+    return CommandOutcome()
+
+
+def _cmd_rewind(ctx: CommandContext, args: str) -> CommandOutcome:
+    cps = ctx.checkpoints
+    if cps is None or not cps.list():
+        ctx.console.print("[dim]nothing to rewind[/dim]")
+        return CommandOutcome()
+    if args.strip():
+        try:
+            seq = int(args.strip())
+        except ValueError:
+            ctx.console.print("[red]usage:[/red] /rewind [N]")
+            return CommandOutcome()
+        restored = cps.rewind_to(seq)
+        if not restored:
+            ctx.console.print(f"[red]no checkpoint {seq}[/red]")
+            return CommandOutcome()
+        cwd = Path(ctx.cwd)
+        files = ", ".join(sorted({str(p.relative_to(cwd)) if p.is_relative_to(cwd) else str(p) for p in restored}))
+        ctx.console.print(f"[yellow]rewound to before #{seq}[/yellow] — restored {files}")
+    else:
+        cp = cps.undo_last()
+        if cp is not None:
+            ctx.console.print(f"[yellow]undid #{cp.seq}[/yellow] — restored {cp.display(Path(ctx.cwd))}")
+    return CommandOutcome()
+
+
 def _builtin_commands() -> list[SlashCommand]:
     return [
         SlashCommand("help", "show available commands", _cmd_help),
@@ -236,6 +281,8 @@ def _builtin_commands() -> list[SlashCommand]:
         SlashCommand("mode", "show or set the permission mode", _cmd_mode, argument_hint="<mode>"),
         SlashCommand("sessions", "list saved sessions for this directory", _cmd_sessions),
         SlashCommand("resume", "resume a saved session", _cmd_resume, argument_hint="<id>"),
+        SlashCommand("checkpoints", "list file checkpoints (undo points)", _cmd_checkpoints),
+        SlashCommand("rewind", "restore files to a checkpoint (no arg = undo last)", _cmd_rewind, argument_hint="[N]"),
     ]
 
 

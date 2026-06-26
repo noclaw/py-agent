@@ -22,6 +22,7 @@ from dataclasses import dataclass
 
 from rich.console import Console
 
+from .checkpoints import Checkpoints, register_checkpoint_hooks
 from .commands import CommandContext, build_registry
 from .compaction import CompactionConfig, Compactor
 from .hooks import HookResult, Hooks, UserPromptSubmit
@@ -309,6 +310,12 @@ async def _run_repl(
     approver = _make_approver(console)
     registry = build_registry(cwd, skills=skills)
 
+    # File-edit checkpoints (for /checkpoints and /rewind), captured via write/edit hooks.
+    checkpoints = Checkpoints()
+    if settings.hooks is None:
+        settings.hooks = Hooks()
+    register_checkpoint_hooks(settings.hooks, checkpoints, cwd)
+
     async with open_model(provider=provider, model=model, spec=spec, reasoning=reasoning) as m:
         tools = _build_tools(m, cwd, permissions, approver, settings)
         system_prompt = build_system_prompt(tools, cwd, skills=skills)
@@ -316,6 +323,7 @@ async def _run_repl(
         ctx = CommandContext(
             console=console, history=history, tools=tools, permissions=permissions, model=m,
             registry=registry, store=store, session=session, cwd=cwd, models=models,
+            checkpoints=checkpoints,
         )
         console.print(f"[bold]py-agent[/bold] [dim]({m.name}, cwd={cwd}, perms={permissions.mode.value})[/dim]")
         if history:

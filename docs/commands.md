@@ -13,6 +13,8 @@ In the REPL, a line starting with `/` is a command. Defined in `agent.commands`.
 | `/mode <mode>` | show or set the [permission mode](permissions.md) |
 | `/sessions` | list saved [sessions](sessions.md) for this directory |
 | `/resume <id>` | resume a saved session |
+| `/checkpoints` | list file-edit checkpoints (snapshots before each `write`/`edit`) |
+| `/rewind [N]` | restore files to checkpoint `N`, or undo the last with no arg |
 | `/skills` | list available [skills](skills.md) |
 | `/skill:<name>` | invoke a skill directly |
 | `/exit`, `/quit` | leave |
