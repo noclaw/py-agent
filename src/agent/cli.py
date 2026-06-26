@@ -24,13 +24,13 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=f"pya {__version__}")
     parser.add_argument(
         "--model",
-        default=DEFAULT_MODEL,
-        help=f"Model id (default: {DEFAULT_MODEL}).",
+        default=None,
+        help=f"Model id (default: ~/.pya/settings.toml `default`, else {DEFAULT_MODEL}).",
     )
     parser.add_argument(
         "--provider",
-        default=DEFAULT_PROVIDER,
-        help=f"Provider id (default: {DEFAULT_PROVIDER}).",
+        default=None,
+        help=f"Provider id (default: from settings, else {DEFAULT_PROVIDER}).",
     )
     parser.add_argument(
         "--reasoning",
@@ -119,8 +119,11 @@ def _cmd_models(provider: str | None, cwd: str) -> int:
     from ``~/.pya/models.json`` / ``<cwd>/.pya/models.json``. No network call."""
     from .models_registry import load_model_registry, merge_catalog
     from .providers.catalog import builtin_models
+    from .settings import load as load_settings
 
-    models = merge_catalog(builtin_models(), load_model_registry(cwd))
+    settings = load_settings()
+    builtins = settings.model_list() if settings.configured else builtin_models()
+    models = merge_catalog(builtins, load_model_registry(cwd))
     if provider is not None:
         models = [m for m in models if m.provider == provider]
     if not models:
@@ -141,11 +144,16 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     # Default: one-shot if -p was given, otherwise the interactive REPL.
     from .app import run
+    from .settings import load as load_settings
+
+    settings = load_settings()
+    provider = args.provider or settings.default_provider or DEFAULT_PROVIDER
+    model = args.model or settings.default_model or DEFAULT_MODEL
 
     permission_mode = "bypass" if args.yolo else args.permission_mode
     return run(
-        provider=args.provider,
-        model=args.model,
+        provider=provider,
+        model=model,
         reasoning=args.reasoning,
         cwd=args.cwd,
         prompt=args.prompt,

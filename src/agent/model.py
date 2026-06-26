@@ -103,7 +103,7 @@ class Model:
                 f"Don't know how to reach {self.name}. Add it to ~/.pya/models.json "
                 f"(provider with baseUrl + api), or pick a known provider."
             )
-        api_key = resolve_api_key(route, self._spec)
+        api_key = resolve_api_key(route, self._spec, provider=self._provider)
         if route.api == "openai-completions":
             return OpenAICompatProvider(
                 base_url=route.base_url, api_key=api_key, provider=self._provider,

@@ -63,10 +63,15 @@ def _build_tools(model, cwd, permissions, approver, settings: _RunSettings):
 
 
 def _available_models(registry_models: ModelRegistry | None):
-    """The model list for the ``/model`` picker: the curated built-in catalog + custom
-    models from ``.pya/models.json``. No network call — works offline."""
+    """The model list for the ``/model`` picker: configured providers' models (from
+    ``~/.pya/settings.toml`` when present, else the curated built-ins) + custom models from
+    ``.pya/models.json``. No network call — works offline."""
+    from .settings import load as load_settings
+
     registry_models = registry_models or ModelRegistry()
-    return merge_catalog(builtin_models(), registry_models)
+    settings = load_settings()
+    builtins = settings.model_list() if settings.configured else builtin_models()
+    return merge_catalog(builtins, registry_models)
 
 
 def _make_transform(model, settings: _RunSettings) -> ContextTransform | None:

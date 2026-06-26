@@ -22,7 +22,7 @@ def test_cli_parser_defaults():
     parser = _build_parser()
     args = parser.parse_args([])
     assert args.command is None
-    assert args.provider == "anthropic"
+    assert args.provider is None  # resolved from settings/defaults in main()
     assert args.prompt is None  # REPL by default
     assert args.cwd == "."
 

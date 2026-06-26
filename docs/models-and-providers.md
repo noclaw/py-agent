@@ -21,17 +21,51 @@ In the REPL, switch at runtime two ways:
   `↑`/`↓` to move, `Enter` to select, `Esc` to cancel. It lists every available model
   (built-in + your custom ones, below). The current model is marked.
 
-Defaults are in `agent/config.py` (`DEFAULT_PROVIDER`, `DEFAULT_MODEL`).
+Defaults are in `agent/config.py` (`DEFAULT_PROVIDER`, `DEFAULT_MODEL`), overridable by
+`default` in `settings.toml` (below).
+
+## Settings (`~/.pya/settings.toml`)
+
+A hand-edited per-user config so you don't have to `export` keys, can scope which providers
+the CLI offers, and can curate the model list. **`chmod 600`** it — it holds API keys — and
+keep it out of any repo.
+
+```toml
+default = "anthropic/claude-opus-4-8"        # optional default model
+
+[providers.anthropic]
+api_key = "sk-ant-api03-..."                 # optional (else the provider's env var)
+models  = ["claude-opus-4-8", "claude-sonnet-4-6"]   # optional allowlist
+
+[providers.openai]
+api_key = "sk-..."
+models  = ["gpt-5.1", "gpt-5-codex"]
+```
+
+- **No `export`** — `api_key` is read at runtime.
+- **Only your providers** — when the file lists any `[providers.*]`, `pya models` and the
+  `/model` picker show *only* those (plus any local models from `.pya/models.json`), not the
+  whole built-in catalog.
+- **Curated models** — `models = [...]` is exactly what you can pick; omit it to fall back to
+  the curated built-ins for that provider.
+
+The `api_key` is keyed by provider name, so it also supplies the key for a local provider
+defined in `.pya/models.json` (keep the key here, the endpoint there). Set
+`PYA_SETTINGS_FILE` to point at a different file. Management commands (`pya auth` / `pya
+config`) are a planned follow-up; for now it's hand-edited.
 
 ## Credentials
 
 Resolution order (per provider):
 
 1. an explicit key in a custom model's `.pya/models.json` spec (`apiKey`),
-2. the provider's environment variable (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
-   `GROQ_API_KEY`, …).
+2. the provider's environment variable (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, …),
+3. the provider's `api_key` in `~/.pya/settings.toml`.
 
-Anthropic uses an **API key** (`ANTHROPIC_API_KEY`). (Claude Pro/Max OAuth isn't used:
+So a key in `settings.toml` means no `export` is needed, while an env var still overrides it
+(handy in CI).
+
+Anthropic uses an **API key** (`ANTHROPIC_API_KEY` or `settings.toml`). (Claude Pro/Max OAuth isn't used:
 Anthropic no longer applies subscription credits to standard API usage, so an OAuth
 subscription token only hits subscription rate limits here.) A provider-neutral OAuth
 toolkit is kept in `agent/providers/oauth.py` for a future OpenAI-compatible OAuth provider,

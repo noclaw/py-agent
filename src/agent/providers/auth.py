@@ -16,12 +16,19 @@ from .catalog import Route
 __all__ = ["resolve_api_key"]
 
 
-def resolve_api_key(route: Route, spec: dict[str, Any] | None) -> str | None:
-    """Resolve the API key: explicit spec ``apiKey`` > the route's env var > ``None``."""
+def resolve_api_key(route: Route, spec: dict[str, Any] | None, provider: str | None = None) -> str | None:
+    """Resolve the API key: explicit spec ``apiKey`` > the provider's env var > the key in
+    ``~/.pya/settings.toml`` > ``None``. (Env overrides the settings file — handy for CI.)"""
     if spec and spec.get("apiKey"):
         return str(spec["apiKey"])
     if route.env_var:
         key = os.environ.get(route.env_var)
+        if key:
+            return key
+    if provider:
+        from ..settings import load
+
+        key = load().api_key(provider)
         if key:
             return key
     return None

@@ -44,9 +44,9 @@ provider. To support a transport we don't ship, implement the small `Provider` p
 
 - Python ≥ 3.11
 - [`uv`](https://docs.astral.sh/uv/) (recommended) or pip
-- Credentials: a provider API key in the environment — `ANTHROPIC_API_KEY`,
-  `OPENAI_API_KEY`, or another provider's key (`GROQ_API_KEY`, …). Local servers usually
-  need none.
+- Credentials: a provider API key — an env var (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, …)
+  or `~/.pya/settings.toml` (no `export` needed; also scopes which providers/models the CLI
+  offers). Local servers usually need none.
 
 No Node and no `pi` install are required — anywhere.
 

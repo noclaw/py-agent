@@ -114,17 +114,18 @@ files or sqlite). Demonstrates swapping the coding toolset for an assistant tool
 same registry — directly serves goal (b). Good companion to
 [`docs/building-your-own-agent.md`](docs/building-your-own-agent.md).
 
-### 2. Settings file (model registry ✅ done)
+### 2. Settings file (model registry ✅ · settings ◑ in progress)
 
-The **model registry** half shipped — custom/local models live in `.pya/models.json`,
-are selectable from the CLI and the `/model` picker, and stream as full specs
-(`models_registry.py`, `picker.py`). Port done: `core/model-registry.ts`.
+The **model registry** shipped — custom/local models in `.pya/models.json`, selectable from
+the CLI and the `/model` picker (`models_registry.py`, `picker.py`).
 
-Still open: a real **settings file** to replace the defaults-and-flags in `config.py` —
-load/merge `.pya/settings.toml` (project) over `~/.pya/settings.toml` (user) for default
-model, permission mode, and retry/compaction tuning, and infer `--context-window` per model
-(the registry already carries `contextWindow`) instead of hard-coding it. Port:
-`packages/coding-agent/src/config.ts`.
+The **settings file** (`~/.pya/settings.toml`, `settings.py`) landed for: provider API keys
+(no `export`), scoping which providers/models the catalog offers, a per-provider model
+allowlist, and a `default` model. Credential order: spec key → env var → settings.
+
+Still open: management commands (`pya auth set/list`, `pya config`); moving permission-mode
+and retry/compaction tuning into settings; inferring `--context-window` per model (the
+catalog/registry carry `contextWindow`) instead of the hard-coded flag.
 
 ### 3. Images / vision
 

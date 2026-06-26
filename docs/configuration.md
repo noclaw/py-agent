@@ -35,6 +35,7 @@ tags each prompt with the current git branch.
 |---|---|
 | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` (etc.) | provider credentials (see [models & providers](models-and-providers.md)) |
 | `PYA_SESSIONS_DIR` | where sessions are stored (default `~/.pya/sessions`) |
+| `PYA_SETTINGS_FILE` | path to the settings file (default `~/.pya/settings.toml`) |
 
 ## The `.pya/` directory
 
@@ -48,7 +49,13 @@ Per-project under your working directory, and per-user under `~/.pya/`:
 ```
 
 Project entries (under `--cwd`) override user entries (`~/.pya/`) with the same name.
-Sessions live under `~/.pya/sessions/` (or `PYA_SESSIONS_DIR`).
+Sessions live under `~/.pya/sessions/` (or `PYA_SESSIONS_DIR`). User-level only:
+
+```
+~/.pya/
+  settings.toml              # provider keys, enabled providers, model allowlist, default
+                             #   (chmod 600 — holds API keys; see models-and-providers.md)
+```
 
 ## Project context
 

@@ -32,6 +32,7 @@ src/agent/
   wire.py           # native StreamEvent / AssistantMessage / ToolCall (the model contract)
   providers/        # native httpx model layer: openai_compat, anthropic, oauth, catalog
   models_registry.py# custom/local models from .pya/models.json
+  settings.py       # ~/.pya/settings.toml: provider keys, allowlist, default
   picker.py         # fuzzy model picker for /model
   system_prompt.py  # build_system_prompt                  (← coding-agent/.../system-prompt.ts)
   config.py         # settings + defaults                  (← coding-agent/src/config.ts)
