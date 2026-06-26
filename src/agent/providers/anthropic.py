@@ -4,9 +4,7 @@ Native streaming for Claude: text + extended thinking (with signature round-trip
 use, normalized into the same ``StreamEvent`` / ``AssistantMessage`` the loop already
 consumes. See ``PROVIDERS.md``.
 
-Auth: an API key on ``x-api-key`` (env ``ANTHROPIC_API_KEY`` or a custom spec key), or an
-OAuth bearer token (Claude Pro/Max — see :mod:`agent.providers.oauth`) on ``Authorization``
-plus the OAuth beta header.
+Auth: an API key on ``x-api-key`` (env ``ANTHROPIC_API_KEY`` or a custom spec key).
 
 Thinking is opt-in via ``reasoning`` (the ``--reasoning`` flag): when set, the request asks
 for adaptive thinking at the mapped effort, and returned ``thinking`` blocks are preserved
@@ -26,7 +24,6 @@ from .http import DEFAULT_TIMEOUT, iter_sse
 __all__ = ["AnthropicProvider"]
 
 ANTHROPIC_VERSION = "2023-06-01"
-OAUTH_BETA = "oauth-2025-04-20"
 DEFAULT_MAX_TOKENS = 16384
 
 #: Anthropic stop_reason -> our stopReason vocabulary (the loop reads tool calls from
@@ -111,24 +108,19 @@ class AnthropicProvider:
         *,
         base_url: str = "https://api.anthropic.com/v1",
         api_key: str | None = None,
-        oauth_token: str | None = None,
         max_tokens: int = DEFAULT_MAX_TOKENS,
         transport: httpx.BaseTransport | None = None,
         timeout: httpx.Timeout | float = DEFAULT_TIMEOUT,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._api_key = api_key
-        self._oauth_token = oauth_token
         self._max_tokens = max_tokens
         self._transport = transport
         self._timeout = timeout
 
     def _headers(self) -> dict[str, str]:
         headers = {"content-type": "application/json", "anthropic-version": ANTHROPIC_VERSION}
-        if self._oauth_token:
-            headers["authorization"] = f"Bearer {self._oauth_token}"
-            headers["anthropic-beta"] = OAUTH_BETA
-        elif self._api_key:
+        if self._api_key:
             headers["x-api-key"] = self._api_key
         return headers
 

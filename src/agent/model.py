@@ -28,7 +28,6 @@ from .providers import (
     route_for,
 )
 from .providers.auth import resolve_api_key
-from .providers.oauth import anthropic_oauth_token
 from .wire import StreamEvent
 
 
@@ -114,9 +113,7 @@ class Model:
             kwargs: dict[str, Any] = {"base_url": route.base_url, "transport": self._transport}
             if self._spec and self._spec.get("maxTokens"):
                 kwargs["max_tokens"] = int(self._spec["maxTokens"])
-            # No API key? Fall back to a Claude Pro/Max OAuth login (~/.pi/agent/auth.json).
-            oauth_token = anthropic_oauth_token() if api_key is None else None
-            return AnthropicProvider(api_key=api_key, oauth_token=oauth_token, **kwargs)
+            return AnthropicProvider(api_key=api_key, **kwargs)
         raise ProviderError(f"No native provider for api {route.api!r} ({self.name}).")
 
     async def stream(

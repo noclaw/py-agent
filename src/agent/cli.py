@@ -111,37 +111,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p_models = sub.add_parser("models", help="List available models (built-ins + custom).")
     p_models.add_argument("--provider", default=None, help="Filter to one provider.")
 
-    p_login = sub.add_parser("login", help="Log in to Claude Pro/Max via OAuth (stores ~/.pya/auth.json).")
-    p_login.add_argument(
-        "--manual", action="store_true",
-        help="Paste the redirect URL instead of using the local callback server (for remote/headless).",
-    )
-    sub.add_parser("logout", help="Remove the stored Anthropic OAuth login.")
-
     return parser
-
-
-def _cmd_login(manual: bool) -> int:
-    from .providers.errors import ProviderError
-    from .providers.oauth import AUTH_PATH, login_anthropic
-
-    try:
-        login_anthropic(manual=manual)
-    except ProviderError as exc:
-        print(f"[error] {exc}", file=sys.stderr)
-        return 1
-    except KeyboardInterrupt:
-        print("\n(cancelled)", file=sys.stderr)
-        return 130
-    print(f"Logged in — token saved to {AUTH_PATH}")
-    return 0
-
-
-def _cmd_logout() -> int:
-    from .providers.oauth import logout_anthropic
-
-    print("Logged out." if logout_anthropic() else "No stored login to remove.")
-    return 0
 
 
 def _cmd_models(provider: str | None, cwd: str) -> int:
@@ -168,10 +138,6 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.command == "models":
         return _cmd_models(args.provider, args.cwd)
-    if args.command == "login":
-        return _cmd_login(args.manual)
-    if args.command == "logout":
-        return _cmd_logout()
 
     # Default: one-shot if -p was given, otherwise the interactive REPL.
     from .app import run

@@ -1,15 +1,15 @@
-"""Anthropic OAuth (Claude Pro/Max) — native login, refresh, and token store.
+"""Generic OAuth 2.0 (authorization-code + PKCE) toolkit for the provider layer.
 
-No `pi` and no Node: `pya login` runs the PKCE authorization-code flow itself (a local
-callback server, or a pasted redirect URL), stores the token in `~/.pya/auth.json`, and
-`pya logout` clears it. At runtime, :func:`anthropic_oauth_token` returns the current access
-token, refreshing it when expired. When no `ANTHROPIC_API_KEY` is set, this is how the
-Anthropic provider authenticates (Bearer + the `anthropic-beta: oauth-2025-04-20` header).
+Reusable building blocks for adding an OAuth-authenticated provider — e.g. an
+OpenAI-compatible service that logs in via OAuth. **Provider-neutral and not wired to
+anything today**: a provider supplies an :class:`OAuthConfig`, and this module runs the
+PKCE flow (local callback server or manual paste), exchanges/refreshes tokens, and stores
+them per-provider in ``~/.pya/auth.json``.
 
-For drop-in compatibility we also read an existing `pi` login from `~/.pi/agent/auth.json`
-if py-agent's own store is empty — but `pya login` writes only to `~/.pya/`.
-
-The OAuth client parameters match Claude's public Pro/Max flow.
+History: this began as the Anthropic Pro/Max login. That was removed once Anthropic stopped
+applying subscription credits to standard API usage (an API key is the right Anthropic
+credential now). The generic toolkit is kept for future OAuth providers; the Anthropic flow
+can be re-added as an :class:`OAuthConfig` if that changes.
 """
 
 from __future__ import annotations
@@ -23,6 +23,7 @@ import threading
 import time
 import urllib.parse
 import webbrowser
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
@@ -30,23 +31,43 @@ import httpx
 
 from .errors import ProviderError
 
-__all__ = ["anthropic_oauth_token", "login_anthropic", "logout_anthropic", "AUTH_PATH"]
+__all__ = [
+    "OAuthConfig",
+    "generate_pkce",
+    "parse_redirect",
+    "build_authorize_url",
+    "exchange_code",
+    "refresh_token",
+    "login",
+    "read_token",
+    "save_token",
+    "clear_token",
+    "current_access_token",
+    "TOKEN_STORE",
+]
 
-#: py-agent's own token store (written by ``pya login``).
-AUTH_PATH = Path.home() / ".pya" / "auth.json"
-#: An existing ``pi`` login, read as a fallback only (never written).
-COMPAT_AUTH_PATH = Path.home() / ".pi" / "agent" / "auth.json"
+#: Per-provider OAuth token store: ``{"<provider>": {type, access, refresh, expires}}``.
+TOKEN_STORE = Path.home() / ".pya" / "auth.json"
 
-_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
-_AUTHORIZE_URL = "https://claude.ai/oauth/authorize"
-_TOKEN_URL = "https://platform.claude.com/v1/oauth/token"
-_CALLBACK_PORT = 53692
-_REDIRECT_URI = f"http://localhost:{_CALLBACK_PORT}/callback"
-_SCOPES = (
-    "org:create_api_key user:profile user:inference "
-    "user:sessions:claude_code user:mcp_servers user:file_upload"
-)
 _SKEW_MS = 60_000
+
+
+@dataclass(frozen=True)
+class OAuthConfig:
+    """Everything provider-specific about an OAuth authorization-code + PKCE flow."""
+
+    provider: str
+    client_id: str
+    authorize_url: str
+    token_url: str
+    redirect_uri: str
+    scopes: str
+    #: Extra params merged into the authorize URL (e.g. ``{"code": "true"}``).
+    extra_authorize_params: dict[str, str] = field(default_factory=dict)
+    #: Local callback server bind (used when ``redirect_uri`` points at ``127.0.0.1``).
+    callback_host: str = "127.0.0.1"
+    callback_port: int = 53692
+    callback_path: str = "/callback"
 
 
 def _now_ms() -> float:
@@ -56,43 +77,41 @@ def _now_ms() -> float:
 # --- token store ------------------------------------------------------------
 
 
-def _read(path: Path) -> dict[str, Any]:
+def _read_store() -> dict[str, Any]:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return json.loads(TOKEN_STORE.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
 
 
-def _persist(cred: dict[str, Any]) -> None:
-    auth = _read(AUTH_PATH)
-    auth["anthropic"] = cred
-    AUTH_PATH.parent.mkdir(parents=True, exist_ok=True)
-    AUTH_PATH.write_text(json.dumps(auth, indent=2), encoding="utf-8")
+def read_token(provider: str) -> dict[str, Any] | None:
+    cred = _read_store().get(provider)
+    return cred if isinstance(cred, dict) else None
 
 
-def anthropic_oauth_token() -> str | None:
-    """The current Anthropic OAuth access token (refreshing if needed), or ``None``."""
-    cred = _read(AUTH_PATH).get("anthropic") or _read(COMPAT_AUTH_PATH).get("anthropic")
-    if not isinstance(cred, dict) or cred.get("type") != "oauth":
-        return None
-    access, expires = cred.get("access"), cred.get("expires")
-    if access and isinstance(expires, (int, float)) and expires > _now_ms() + _SKEW_MS:
-        return access
-    refresh = cred.get("refresh")
-    if refresh:
-        refreshed = _refresh(refresh)
-        if refreshed:
-            _persist(refreshed)
-            return refreshed["access"]
-    return access  # fall back; the API reports an auth error if it's stale
+def save_token(provider: str, cred: dict[str, Any]) -> None:
+    store = _read_store()
+    store[provider] = cred
+    TOKEN_STORE.parent.mkdir(parents=True, exist_ok=True)
+    TOKEN_STORE.write_text(json.dumps(store, indent=2), encoding="utf-8")
+
+
+def clear_token(provider: str) -> bool:
+    """Remove a provider's stored token. Returns whether one existed."""
+    store = _read_store()
+    if provider not in store:
+        return False
+    del store[provider]
+    TOKEN_STORE.write_text(json.dumps(store, indent=2), encoding="utf-8")
+    return True
 
 
 # --- token endpoint ---------------------------------------------------------
 
 
-def _post_token(body: dict[str, Any]) -> dict[str, Any]:
+def _post_token(config: OAuthConfig, body: dict[str, Any]) -> dict[str, Any]:
     resp = httpx.post(
-        _TOKEN_URL, json=body,
+        config.token_url, json=body,
         headers={"content-type": "application/json", "accept": "application/json"},
         timeout=30.0,
     )
@@ -100,27 +119,57 @@ def _post_token(body: dict[str, Any]) -> dict[str, Any]:
     return resp.json()
 
 
-def _cred_from_token_response(data: dict[str, Any]) -> dict[str, Any]:
+def _cred(data: dict[str, Any]) -> dict[str, Any]:
     return {
         "type": "oauth",
         "access": data["access_token"],
         "refresh": data.get("refresh_token", ""),
-        # Match Claude's client: bake in a 5-minute safety margin.
         "expires": _now_ms() + int(data.get("expires_in", 0)) * 1000 - 5 * 60 * 1000,
     }
 
 
-def _refresh(refresh_token: str) -> dict[str, Any] | None:
+def exchange_code(config: OAuthConfig, code: str, state: str, verifier: str) -> dict[str, Any]:
     try:
-        data = _post_token(
-            {"grant_type": "refresh_token", "client_id": _CLIENT_ID, "refresh_token": refresh_token}
-        )
+        data = _post_token(config, {
+            "grant_type": "authorization_code",
+            "client_id": config.client_id,
+            "code": code,
+            "state": state,
+            "redirect_uri": config.redirect_uri,
+            "code_verifier": verifier,
+        })
+        return _cred(data)
+    except (httpx.HTTPError, ValueError, KeyError) as exc:
+        raise ProviderError(f"OAuth token exchange failed: {exc}") from exc
+
+
+def refresh_token(config: OAuthConfig, refresh: str) -> dict[str, Any] | None:
+    try:
+        data = _post_token(config, {
+            "grant_type": "refresh_token", "client_id": config.client_id, "refresh_token": refresh,
+        })
     except (httpx.HTTPError, ValueError, KeyError):
         return None
-    refreshed = _cred_from_token_response(data)
-    if not refreshed.get("refresh"):
-        refreshed["refresh"] = refresh_token  # reuse if the server didn't rotate it
-    return refreshed
+    cred = _cred(data)
+    if not cred["refresh"]:
+        cred["refresh"] = refresh  # reuse if the server didn't rotate it
+    return cred
+
+
+def current_access_token(config: OAuthConfig) -> str | None:
+    """The current access token for ``config.provider`` (refreshing if expired), or ``None``."""
+    cred = read_token(config.provider)
+    if not cred or cred.get("type") != "oauth":
+        return None
+    access, expires = cred.get("access"), cred.get("expires")
+    if access and isinstance(expires, (int, float)) and expires > _now_ms() + _SKEW_MS:
+        return access
+    if cred.get("refresh"):
+        refreshed = refresh_token(config, cred["refresh"])
+        if refreshed:
+            save_token(config.provider, refreshed)
+            return refreshed["access"]
+    return access
 
 
 # --- PKCE + login -----------------------------------------------------------
@@ -130,24 +179,24 @@ def _b64url(raw: bytes) -> str:
     return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
 
 
-def _pkce() -> tuple[str, str]:
+def generate_pkce() -> tuple[str, str]:
     verifier = _b64url(secrets.token_bytes(32))
     challenge = _b64url(hashlib.sha256(verifier.encode("ascii")).digest())
     return verifier, challenge
 
 
-def authorize_url(challenge: str, state: str) -> str:
-    params = urllib.parse.urlencode({
-        "code": "true",
-        "client_id": _CLIENT_ID,
+def build_authorize_url(config: OAuthConfig, challenge: str, state: str) -> str:
+    params = {
+        "client_id": config.client_id,
         "response_type": "code",
-        "redirect_uri": _REDIRECT_URI,
-        "scope": _SCOPES,
+        "redirect_uri": config.redirect_uri,
+        "scope": config.scopes,
         "code_challenge": challenge,
         "code_challenge_method": "S256",
         "state": state,
-    })
-    return f"{_AUTHORIZE_URL}?{params}"
+        **config.extra_authorize_params,
+    }
+    return f"{config.authorize_url}?{urllib.parse.urlencode(params)}"
 
 
 def parse_redirect(text: str) -> tuple[str | None, str | None]:
@@ -167,31 +216,13 @@ def parse_redirect(text: str) -> tuple[str | None, str | None]:
     return value, None
 
 
-def _exchange(code: str, state: str, verifier: str) -> dict[str, Any]:
-    try:
-        data = _post_token({
-            "grant_type": "authorization_code",
-            "client_id": _CLIENT_ID,
-            "code": code,
-            "state": state,
-            "redirect_uri": _REDIRECT_URI,
-            "code_verifier": verifier,
-        })
-    except (httpx.HTTPError, ValueError) as exc:
-        raise ProviderError(f"OAuth token exchange failed: {exc}") from exc
-    try:
-        return _cred_from_token_response(data)
-    except KeyError as exc:
-        raise ProviderError(f"OAuth token response missing {exc}") from exc
-
-
-def _start_callback_server(expected_state: str, holder: dict[str, str]) -> tuple[Any, threading.Event]:
+def _start_callback_server(config: OAuthConfig, expected_state: str, holder: dict[str, str]):
     done = threading.Event()
 
     class Handler(http.server.BaseHTTPRequestHandler):
         def do_GET(self) -> None:  # noqa: N802
             parsed = urllib.parse.urlparse(self.path)
-            if parsed.path != "/callback":
+            if parsed.path != config.callback_path:
                 self.send_error(404)
                 return
             q = urllib.parse.parse_qs(parsed.query)
@@ -199,7 +230,7 @@ def _start_callback_server(expected_state: str, holder: dict[str, str]) -> tuple
             ok = bool(code) and state == expected_state
             if ok:
                 holder["code"], holder["state"] = code, state  # type: ignore[assignment]
-            msg = "Login complete — you can close this tab." if ok else "Login failed; try `pya login --manual`."
+            msg = "Login complete — you can close this tab." if ok else "Login failed; try --manual."
             body = f"<html><body style='font-family:sans-serif;padding:2rem'>{msg}</body></html>".encode()
             self.send_response(200)
             self.send_header("content-type", "text/html; charset=utf-8")
@@ -209,15 +240,16 @@ def _start_callback_server(expected_state: str, holder: dict[str, str]) -> tuple
             if ok:
                 done.set()
 
-        def log_message(self, *args: Any) -> None:  # silence the default access log
-            pass
+        def log_message(self, *args: Any) -> None:  # silence the access log
+            del args
 
-    server = http.server.HTTPServer(("127.0.0.1", _CALLBACK_PORT), Handler)
+    server = http.server.HTTPServer((config.callback_host, config.callback_port), Handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     return server, done
 
 
-def login_anthropic(
+def login(
+    config: OAuthConfig,
     *,
     manual: bool = False,
     timeout: float = 300.0,
@@ -225,9 +257,9 @@ def login_anthropic(
     prompt: Callable[[str], str] = input,
     echo: Callable[[str], Any] = print,
 ) -> dict[str, Any]:
-    """Run the OAuth login flow and persist the token. Returns the stored credential."""
-    verifier, challenge = _pkce()
-    url = authorize_url(challenge, state=verifier)
+    """Run the OAuth login flow for ``config`` and persist the token. Returns the credential."""
+    verifier, challenge = generate_pkce()
+    url = build_authorize_url(config, challenge, state=verifier)
 
     if manual:
         echo(f"Open this URL, approve, then paste the resulting URL (or code):\n\n{url}\n")
@@ -239,11 +271,11 @@ def login_anthropic(
     else:
         holder: dict[str, str] = {}
         try:
-            server, done = _start_callback_server(verifier, holder)
+            server, done = _start_callback_server(config, verifier, holder)
         except OSError as exc:
             raise ProviderError(
-                f"Couldn't start the local callback server on :{_CALLBACK_PORT} ({exc}). "
-                f"Re-run with `pya login --manual`."
+                f"Couldn't start the callback server on {config.callback_host}:{config.callback_port} "
+                f"({exc}). Re-run with --manual."
             ) from exc
         echo(f"Opening your browser to log in…\n\nIf it doesn't open, visit:\n{url}\n")
         try:
@@ -252,7 +284,7 @@ def login_anthropic(
             pass
         try:
             if not done.wait(timeout):
-                raise ProviderError("Login timed out. Re-run with `pya login --manual`.")
+                raise ProviderError("Login timed out. Re-run with --manual.")
         finally:
             server.shutdown()
         code, state = holder.get("code"), holder.get("state")
@@ -261,16 +293,6 @@ def login_anthropic(
         raise ProviderError("No authorization code received.")
     if state and state != verifier:
         raise ProviderError("OAuth state mismatch — aborting for safety.")
-    cred = _exchange(code, state or verifier, verifier)
-    _persist(cred)
+    cred = exchange_code(config, code, state or verifier, verifier)
+    save_token(config.provider, cred)
     return cred
-
-
-def logout_anthropic() -> bool:
-    """Remove the stored Anthropic login from ``~/.pya/auth.json``. Returns whether one existed."""
-    auth = _read(AUTH_PATH)
-    if "anthropic" not in auth:
-        return False
-    del auth["anthropic"]
-    AUTH_PATH.write_text(json.dumps(auth, indent=2), encoding="utf-8")
-    return True

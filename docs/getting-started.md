@@ -7,11 +7,9 @@ for everyday use.
 ## Requirements
 
 - Python ≥ 3.11 and [`uv`](https://docs.astral.sh/uv/) (or pip). No Node required.
-- Credentials (either one):
-  - a provider API key in the environment, e.g. `export ANTHROPIC_API_KEY=...` /
-    `export OPENAI_API_KEY=...`, or
-  - for Claude Pro/Max, run **`pya login`** — a native OAuth browser flow (token saved to
-    `~/.pya/auth.json`, refreshed automatically; `pya logout` clears it). No Node, no `pi`.
+- Credentials: a provider API key in the environment — `export ANTHROPIC_API_KEY=...` /
+  `export OPENAI_API_KEY=...` (or another provider's key). Local OpenAI-compatible servers
+  usually need none. No Node, no `pi`.
 
 The model layer is native Python (httpx) talking directly to provider HTTP APIs —
 OpenAI-compatible (OpenAI + local servers) and Anthropic. See
@@ -51,20 +49,16 @@ The rest of these docs write `pya`; under the developer flow, prefix with `uv ru
 Credentials resolve in this order (per provider):
 
 1. an explicit key in a `.pya/models.json` model spec (custom/local models),
-2. the provider's **environment variable** (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, …),
-3. for Anthropic only: a Claude **Pro/Max OAuth login** in `~/.pi/agent/auth.json`.
+2. the provider's **environment variable** (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, …).
 
 So pick whichever fits:
 
 ```bash
 # Anthropic
-export ANTHROPIC_API_KEY=sk-ant-...
+export ANTHROPIC_API_KEY=sk-ant-api03-...
 
 # OpenAI
 export OPENAI_API_KEY=sk-...
-
-# …or, for Claude Pro/Max, log in via OAuth (no env var needed)
-pya login   # native browser flow; pya logout clears it; token in ~/.pya/auth.json
 ```
 
 OpenAI-compatible providers (`groq`, `together`, `openrouter`, …) follow the same
@@ -114,8 +108,8 @@ pya --yolo            # skip approval prompts (allow everything)
 
 - **`pya: command not found`** after `uv tool install` — `~/.local/bin` isn't on `PATH`.
   Run `uv tool update-shell` and restart the shell (or use the `uv run pya` flow).
-- **Auth / 401 errors mid-turn** — the provider key isn't set, or a Pro/Max OAuth token
-  expired. Set the env var, or re-run `pi` → `/login`.
+- **Auth / 401 errors mid-turn** — the provider key isn't set. `export ANTHROPIC_API_KEY=…`
+  / `OPENAI_API_KEY=…` (or the relevant provider's key).
 - **`rate_limit_error` (429)** — a provider-side rate/usage cap. Wait and retry, or switch
   to a different key/model.
 - **Unknown provider** — only `anthropic`/`openai`(-compatible) are built in; add others to

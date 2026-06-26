@@ -6,11 +6,9 @@ For the full tour see the [README](README.md); for depth see [`docs/`](docs/READ
 ## 1. Prerequisites
 
 - **Python ≥ 3.11** and [`uv`](https://docs.astral.sh/uv/) (recommended) — or pip. No Node.
-- **Credentials** — either of:
-  - a provider API key in your environment (e.g. `export ANTHROPIC_API_KEY=...` or
-    `export OPENAI_API_KEY=...`), **or**
-  - for Claude Pro/Max, run **`pya login`** — a native OAuth browser flow (token saved to
-    `~/.pya/auth.json`; `pya logout` clears it). No Node, no `pi`.
+- **Credentials** — a provider API key in your environment (e.g.
+  `export ANTHROPIC_API_KEY=...` or `export OPENAI_API_KEY=...`). Local OpenAI-compatible
+  servers usually need none. No Node, no `pi`.
 
 ## 2. Install
 
@@ -88,7 +86,7 @@ credential resolution order and local/self-hosted models, see
 |---|---|
 | `pya: command not found` after `uv tool install` | `~/.local/bin` isn't on `PATH` — run `uv tool update-shell`, then restart the shell. |
 | `models` shows nothing useful | Set a provider key (`ANTHROPIC_API_KEY`/`OPENAI_API_KEY`) and pick that provider; add local models in `~/.pya/models.json`. |
-| auth / 401 errors mid-turn | The provider key isn't set (or the Pro/Max OAuth login expired). Set the env var, or re-run `pi` → `/login`. |
+| auth / 401 errors mid-turn | The provider key isn't set. `export ANTHROPIC_API_KEY=…` / `OPENAI_API_KEY=…`. |
 | `rate_limit_error` (429) | Provider-side rate/usage limit — wait and retry, or use a different key/model. |
 | wrong directory | `pya --cwd /path/to/project` sets where the agent reads/writes files. |
 

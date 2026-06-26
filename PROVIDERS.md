@@ -8,11 +8,13 @@ now native Python (httpx) talking directly to provider HTTP APIs.
 - `agent/wire.py` — native `StreamEvent`/`AssistantMessage`/`ToolCall`; all imports
   repointed off `pi_py_sdk`, which is **removed from dependencies** (clean break).
 - `providers/anthropic.py` — native Anthropic Messages backend: streaming, extended
-  thinking with **signature round-trip**, tool use, usage.
-- `providers/oauth.py` — **native** Claude Pro/Max OAuth: `pya login` runs the PKCE flow
-  itself (local callback server or `--manual` paste), `pya logout` clears it, tokens live in
-  `~/.pya/auth.json` and auto-refresh. No `pi` for login *or* runtime (an existing
-  `~/.pi/agent/auth.json` is read as a fallback). This was the last `pi` dependency — gone.
+  thinking with **signature round-trip**, tool use, usage. Auth: `ANTHROPIC_API_KEY`.
+- `providers/oauth.py` — a **provider-neutral** OAuth (auth-code + PKCE) toolkit: PKCE,
+  local callback server, redirect parsing, per-provider token store (`~/.pya/auth.json`),
+  exchange/refresh. Kept for a future OpenAI-compatible OAuth provider; **not wired to
+  anything today**. (It originally backed a Claude Pro/Max login, removed once Anthropic
+  stopped applying subscription credits to standard API usage — an API key is the right
+  Anthropic credential now.)
 - Routing in `model.py` covers both native APIs; `open_model` no longer spawns a subprocess.
 - `pya models` / the `/model` picker list from a curated static catalog
   (`providers/catalog.py`) + `.pya/models.json` — offline, no Node.

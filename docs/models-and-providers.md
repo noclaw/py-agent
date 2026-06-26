@@ -29,15 +29,13 @@ Resolution order (per provider):
 
 1. an explicit key in a custom model's `.pya/models.json` spec (`apiKey`),
 2. the provider's environment variable (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
-   `GROQ_API_KEY`, …),
-3. for Anthropic only: a Claude **Pro/Max OAuth login**. Run **`pya login`** — a native
-   PKCE browser flow (a local callback on `127.0.0.1:53692`, or `pya login --manual` to
-   paste the redirect URL) that stores the token in `~/.pya/auth.json`; `pya logout` clears
-   it. `agent/providers/oauth.py` reads and auto-refreshes it, sending the bearer token with
-   the `anthropic-beta: oauth-2025-04-20` header. An existing `pi` login
-   (`~/.pi/agent/auth.json`) is also read as a fallback.
+   `GROQ_API_KEY`, …).
 
-So `pya login` once and Anthropic works with no env var — no Node, no `pi`.
+Anthropic uses an **API key** (`ANTHROPIC_API_KEY`). (Claude Pro/Max OAuth isn't used:
+Anthropic no longer applies subscription credits to standard API usage, so an OAuth
+subscription token only hits subscription rate limits here.) A provider-neutral OAuth
+toolkit is kept in `agent/providers/oauth.py` for a future OpenAI-compatible OAuth provider,
+but it isn't wired to anything today.
 
 ## Reasoning / thinking
 
@@ -86,7 +84,7 @@ pya --provider local --model qwen3 -p "hi"  # select by id from the CLI
 
 In the REPL, `/model` (no args) shows them in the fuzzy picker alongside built-ins, or
 `/model local/qwen3` switches directly. The model's `apiKey` is sent as the credential; for
-built-in providers, credentials still resolve via env var or `~/.pi/agent` OAuth as above.
+built-in providers, credentials resolve via the provider's env var as above.
 
 Under the hood the registry flattens each entry into a full pi-ai model object and streams
 it as a `model=` spec (the `PiModelClient.stream` seam accepts an id *or* a full object).
