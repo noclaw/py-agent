@@ -117,46 +117,24 @@ example to be complete; they're the natural next seams. Roughly ordered by value
 project's two goals — (a) readable learning example, (b) base for assistant / second-brain
 agents.
 
-### 1. Memory / second-brain tools — ✅ shipped
-
-The repurposing showcase: `note`, `recall`, `search_memory` over a local markdown store.
-Demonstrates swapping the coding toolset for an assistant toolset via the same registry —
-directly serves goal (b). See `tools/memory.py`, the `memory_tools()` bundle, and the
-companion [`docs/building-your-own-agent.md`](docs/building-your-own-agent.md). A natural next
-step is a sqlite/embeddings backend behind the same three tools.
-
-### 2. Images / vision
+### 1. Images / vision
 
 Read-tool image attachments + passing image content blocks through to the model (both
 provider backends support image input). Mostly plumbing.
 
-### 3. Todo / planning tool — ✅ shipped
-
-A `todo_write` tool (Claude Code's `TodoWrite` shape) the agent uses to track a multi-step
-plan, rendered as a live checklist. Demonstrates a tool that mutates *shared run state* (the
-tool instance's own list) rather than the filesystem — auto-allowed. See `tools/todo.py` and
-the renderer's `_render_todos`.
-
-### 4. Token / cost budget
+### 2. Token / cost budget
 
 Enforce a per-run ceiling on tokens (or estimated cost) using the `usage` the renderer
 already accumulates: warn near the limit, stop cleanly when exceeded. Pairs with compaction
 (`--context-window`) and gives long autonomous runs a guardrail.
 
-### 5. MCP tool servers
+### 3. MCP tool servers
 
 Expose external [MCP](https://modelcontextprotocol.io) tools through the same `Tool`
 protocol (an adapter that lists remote tools and proxies `execute`). Powerful but heavier
 than skills, and less central to the learning/second-brain goals.
 
-### 6. Persistent permission rules — ✅ shipped
-
-Allow/deny rules built up via "always" approvals (or the `/permissions` command) are saved to
-`<cwd>/.pya/permissions.json` and reloaded next session, instead of living only in memory for
-the current run. See `PermissionStore` + `Permissions.load` in `permissions.py` and
-`/permissions` in `commands.py`.
-
-### 7. Polish
+### 4. Polish
 
 Richer TUI (`textual`/`prompt_toolkit`), HTML/markdown transcript export, themes, and
 persisting a `compaction` entry into the session JSONL so resumed runs keep the summary.
