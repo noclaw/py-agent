@@ -14,6 +14,7 @@ import json
 from typing import Any
 
 from rich.console import Console
+from rich.markup import escape
 
 from .types import (
     AgentEnd,
@@ -85,6 +86,8 @@ class Renderer:
             result = event.result
             if result.is_error:
                 self.console.print(f"  [red]✗ {_first_line(result.content)}[/red]")
+            elif event.tool_name == "todo_write":
+                self._render_todos(result)
             else:
                 self.console.print(f"  [green]✓[/green] [dim]{_first_line(result.content)}[/dim]")
         elif isinstance(event, AgentRetry):
@@ -105,6 +108,20 @@ class Renderer:
             )
         elif isinstance(event, AgentEnd):
             self._on_end(event)
+
+    def _render_todos(self, result: Any) -> None:
+        """Draw the todo checklist (✓/▶/☐) from a ``todo_write`` result's details."""
+        todos = (result.details or {}).get("todos") if isinstance(result.details, dict) else None
+        if not todos:
+            self.console.print("  [green]✓[/green] [dim](todo list cleared)[/dim]")
+            return
+        glyph = {"completed": "[green]✓[/green]", "in_progress": "[yellow]▶[/yellow]", "pending": "[dim]☐[/dim]"}
+        style = {"completed": "dim strike", "in_progress": "bold"}
+        for item in todos:
+            status = getattr(item.status, "value", item.status)
+            content = escape(getattr(item, "content", ""))  # content is model text — don't parse markup
+            label = f"[{style[status]}]{content}[/]" if status in style else content
+            self.console.print(f"  {glyph.get(status, '☐')} {label}", highlight=False)
 
     def _on_delta(self, event: AssistantDelta) -> None:
         ev = event.event

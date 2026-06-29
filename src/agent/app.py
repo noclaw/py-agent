@@ -216,7 +216,7 @@ def run(
             it from the model's metadata (catalog/registry), falling back to a default.
         subagent: expose a ``task`` tool that can spawn sub-agents.
     """
-    permissions = Permissions(mode=PermissionMode(permission_mode))
+    permissions = Permissions.load(cwd, mode=PermissionMode(permission_mode))
     store = None if no_session else SessionStore()
     session, history, provider, model = _resolve_session(
         store, cwd, provider, model, continue_session=continue_session, resume=resume

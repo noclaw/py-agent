@@ -20,6 +20,7 @@ from .ls import LsTool
 from .memory import NoteTool, RecallTool, SearchMemoryTool
 from .read import ReadTool
 from .task import TaskTool
+from .todo import TodoWriteTool
 from .web import WebFetchTool, WebSearchTool
 from .write import WriteTool
 
@@ -41,6 +42,7 @@ BUILTIN_TOOL_CLASSES: tuple[type[Tool], ...] = (
     RecallTool,
     SearchMemoryTool,
     NoteTool,
+    TodoWriteTool,
 )
 
 #: All built-in tool classes, by name (derived from :data:`BUILTIN_TOOL_CLASSES`).

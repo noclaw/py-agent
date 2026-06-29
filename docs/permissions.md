@@ -55,12 +55,32 @@ allow write {"path": "a.py", "content": "..."}? [y/N/a]
 ```
 
 - `y` — allow once
-- `a` — allow always: adds a session allow-rule (for `bash` it's scoped to the command's
-  first word, e.g. `bash(npm *)`; for others, the tool name) so you aren't asked again
+- `a` — allow always: adds an allow-rule (for `bash` it's scoped to the command's first word,
+  e.g. `bash(npm *)`; for others, the tool name) so you aren't asked again — and **persists**
+  it (see below)
 - `n` — deny (the model gets an error result and adapts)
 
 Approval prompts are serialized even when tools run in parallel, so they never interleave.
 In non-interactive use, an approver that can't read input denies by default.
+
+## Persistent rules
+
+Allow/deny rules survive across sessions: they're saved to `<cwd>/.pya/permissions.json`
+(a small `{"allow": [...], "deny": [...]}` object, alongside the rest of `.pya/`) and reloaded
+on startup. An "always" approval writes through automatically, and the **`/permissions`**
+command shows and edits them:
+
+```
+/permissions                       # show mode + current allow/deny rules
+/permissions allow bash(git *)     # add an allow rule (persisted)
+/permissions deny  write(secret/*) # add a deny rule (persisted)
+/permissions remove bash(git *)    # drop a rule
+/permissions reset                 # clear all rules
+```
+
+Under the hood, `Permissions.load(cwd, mode=…)` seeds a `Permissions` from the file and keeps
+a `PermissionStore` attached so later edits are written back; persistence is best-effort and
+never breaks a run.
 
 ## Programmatic use
 

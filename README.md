@@ -10,12 +10,12 @@ a clean starting point for personal-assistant / second-brain agents (swap the co
 toolset for your own).
 
 > **Status:** working end to end — the full tool set (read/write/edit/bash/grep/find/ls plus
-> **web fetch/search** and **memory** note/recall/search), the agent loop, system prompt,
-> interactive CLI/REPL, **permissions**, **hooks**, **slash commands** with custom markdown
-> commands, **skills**, **session** save/resume, **compaction**, **auto-retry**, **sub-agents**
-> (a `task` tool), a **model picker**, credential/config management (`pya auth` / `pya config`),
-> and a **native provider layer** (OpenAI-compatible + Anthropic, no Node). See
-> [`PLAN.md`](PLAN.md).
+> **web fetch/search**, **memory** note/recall/search, and a **todo** planner), the agent
+> loop, system prompt, interactive CLI/REPL, **permissions** (with persistent rules), **hooks**,
+> **slash commands** with custom markdown commands, **skills**, **session** save/resume,
+> **compaction**, **auto-retry**, **sub-agents** (a `task` tool), a **model picker**,
+> credential/config management (`pya auth` / `pya config`), and a **native provider layer**
+> (OpenAI-compatible + Anthropic, no Node). See [`PLAN.md`](PLAN.md).
 
 ## Architecture
 

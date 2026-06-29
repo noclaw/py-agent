@@ -68,6 +68,25 @@ def test_tools_lists_tool_names():
     assert "read" in out and "bash" in out and "grep" in out
 
 
+def test_permissions_show_and_edit(tmp_path):
+    perms = Permissions.load(tmp_path)
+    ctx, buf, registry = _ctx(permissions=perms)
+    # add an allow rule via the command → persisted
+    registry.dispatch("/permissions allow bash(git *)", ctx)
+    assert "bash(git *)" in perms.allow
+    assert (tmp_path / ".pya" / "permissions.json").exists()
+    # show lists it
+    registry.dispatch("/permissions", ctx)
+    out = buf.getvalue()
+    assert "bash(git *)" in out and "allow" in out
+    # remove and reset
+    registry.dispatch("/permissions remove bash(git *)", ctx)
+    assert perms.allow == []
+    registry.dispatch("/permissions deny write(secret/*)", ctx)
+    registry.dispatch("/permissions reset", ctx)
+    assert perms.allow == [] and perms.deny == []
+
+
 def test_model_switch():
     ctx, buf, registry = _ctx()
     registry.dispatch("/model anthropic/claude-opus-4-8", ctx)

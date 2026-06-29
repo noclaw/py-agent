@@ -228,6 +228,45 @@ def _cmd_mode(ctx: CommandContext, args: str) -> CommandOutcome:
     return CommandOutcome()
 
 
+def _cmd_permissions(ctx: CommandContext, args: str) -> CommandOutcome:
+    """Show or edit the persisted allow/deny rules (saved to .pya/permissions.json)."""
+    perms = ctx.permissions
+    parts = args.split(maxsplit=1)
+    sub = parts[0].lower() if parts else ""
+    rule = parts[1].strip() if len(parts) > 1 else ""
+
+    if sub in ("allow", "deny"):
+        if not rule:
+            ctx.console.print(f"[red]usage:[/red] /permissions {sub} <rule>  (e.g. bash(git *))")
+            return CommandOutcome()
+        added = perms.add_rule(sub, rule)
+        ctx.console.print(f"{'added' if added else 'already present'}: [cyan]{sub}[/cyan] {rule}")
+        return CommandOutcome()
+    if sub == "remove":
+        ctx.console.print(f"removed [cyan]{rule}[/cyan]" if perms.remove_rule(rule) else f"[dim]no such rule: {rule}[/dim]")
+        return CommandOutcome()
+    if sub == "reset":
+        perms.clear_rules()
+        ctx.console.print("[yellow]cleared all permission rules[/yellow]")
+        return CommandOutcome()
+    if sub:
+        ctx.console.print(f"[red]unknown:[/red] /permissions {sub} — use allow/deny/remove/reset")
+        return CommandOutcome()
+
+    # No args: show current state.
+    ctx.console.print(f"permission mode: [cyan]{perms.mode.value}[/cyan]")
+    ctx.console.print(f"[bold]allow[/bold] ({len(perms.allow)})" + ("" if perms.allow else " [dim]—[/dim]"))
+    for r in perms.allow:
+        ctx.console.print(f"  [green]+[/green] {r}")
+    ctx.console.print(f"[bold]deny[/bold] ({len(perms.deny)})" + ("" if perms.deny else " [dim]—[/dim]"))
+    for r in perms.deny:
+        ctx.console.print(f"  [red]-[/red] {r}")
+    persisted = perms.store.path if perms.store is not None else None
+    where = f" [dim](saved to {persisted})[/dim]" if persisted else " [dim](not persisted)[/dim]"
+    ctx.console.print(f"[dim]/permissions allow|deny <rule> · remove <rule> · reset[/dim]{where}")
+    return CommandOutcome()
+
+
 def _cmd_checkpoints(ctx: CommandContext, args: str) -> CommandOutcome:
     cps = ctx.checkpoints
     if cps is None:
@@ -279,6 +318,7 @@ def _builtin_commands() -> list[SlashCommand]:
         SlashCommand("tools", "list the available tools", _cmd_tools),
         SlashCommand("model", "show or switch the model", _cmd_model, argument_hint="[provider/]model"),
         SlashCommand("mode", "show or set the permission mode", _cmd_mode, argument_hint="<mode>"),
+        SlashCommand("permissions", "show or edit saved allow/deny rules", _cmd_permissions, argument_hint="[allow|deny|remove <rule> | reset]"),
         SlashCommand("sessions", "list saved sessions for this directory", _cmd_sessions),
         SlashCommand("resume", "resume a saved session", _cmd_resume, argument_hint="<id>"),
         SlashCommand("checkpoints", "list file checkpoints (undo points)", _cmd_checkpoints),

@@ -97,6 +97,12 @@ Beyond the seven core phases, these optional features are also built:
   `search_memory` (find) over one local markdown store (`~/.pya/memory.md`, override with
   `PYA_MEMORY_FILE`). In the default toolset and as a standalone `memory_tools()` bundle —
   the assistant-repurposing showcase. `tools/memory.py`.
+- ✅ **Todo / planning tool** — `todo_write` (Claude Code's `TodoWrite` shape) tracks a
+  multi-step plan as a checklist the renderer draws live; mutates *shared run state* (the
+  tool's own list), not the filesystem, so it's auto-allowed. `tools/todo.py`.
+- ✅ **Persistent permission rules** — allow/deny rules (from "always" approvals or the
+  `/permissions` command) are saved to `<cwd>/.pya/permissions.json` and reloaded next
+  session. `PermissionStore` in `permissions.py`; `/permissions` in `commands.py`.
 
 **Tests:** ~199 unit (scripted fake-model fixture + `httpx.MockTransport`, no network; the
 picker's interactive path runs through a PTY) + a few gated live integration tests
@@ -124,11 +130,12 @@ step is a sqlite/embeddings backend behind the same three tools.
 Read-tool image attachments + passing image content blocks through to the model (both
 provider backends support image input). Mostly plumbing.
 
-### 3. Todo / planning tool
+### 3. Todo / planning tool — ✅ shipped
 
-A `todo` tool (Claude Code's `TodoWrite` shape) the agent uses to track a multi-step plan,
-rendered as a checklist. Improves long-task behavior and demonstrates a tool that mutates
-*shared run state* rather than the filesystem.
+A `todo_write` tool (Claude Code's `TodoWrite` shape) the agent uses to track a multi-step
+plan, rendered as a live checklist. Demonstrates a tool that mutates *shared run state* (the
+tool instance's own list) rather than the filesystem — auto-allowed. See `tools/todo.py` and
+the renderer's `_render_todos`.
 
 ### 4. Token / cost budget
 
@@ -142,10 +149,12 @@ Expose external [MCP](https://modelcontextprotocol.io) tools through the same `T
 protocol (an adapter that lists remote tools and proxies `execute`). Powerful but heavier
 than skills, and less central to the learning/second-brain goals.
 
-### 6. Persistent permission rules
+### 6. Persistent permission rules — ✅ shipped
 
-Save the allow/deny rules built up via the "always" approval to `.pya/` so they carry across
-sessions, instead of living only in memory for the current run (`permissions.py`).
+Allow/deny rules built up via "always" approvals (or the `/permissions` command) are saved to
+`<cwd>/.pya/permissions.json` and reloaded next session, instead of living only in memory for
+the current run. See `PermissionStore` + `Permissions.load` in `permissions.py` and
+`/permissions` in `commands.py`.
 
 ### 7. Polish
 

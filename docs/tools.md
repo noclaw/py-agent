@@ -16,6 +16,7 @@ Tools are how the agent acts. Built-ins live in `src/agent/tools/`:
 | `note` | save a note to long-term memory (a local markdown store) |
 | `recall` | read back the most recent notes from memory |
 | `search_memory` | search memory for notes matching a query |
+| `todo_write` | track a multi-step plan as a checklist (mutates run state, not files) |
 | `task` | delegate a focused sub-task to a [sub-agent](#sub-agents-the-task-tool) (opt-in) |
 
 Bundles: `coding_tools(cwd)` (the file/shell tools + the web and memory tools),
@@ -46,6 +47,15 @@ is one human-readable file — `~/.pya/memory.md` by default, overridable with t
 mutating (gated like `write`/`edit`; its rules match on the note text, e.g.
 `Permissions(deny=["note(*secret*)"])`); `recall`/`search_memory` are read-only. Together they
 make the loop a persistent second brain — see [Building your own agent](building-your-own-agent.md).
+
+### Todo / planning tool
+
+`todo_write(todos=[...])` records a structured plan — each item has `content` and a `status`
+(`pending` / `in_progress` / `completed`). Sending the list **replaces** the previous one
+(write semantics), so the model keeps the full plan up to date as it works; the renderer draws
+it as a live checklist (`✓` done, `▶` in progress, `☐` pending). Unlike the file tools it
+mutates *shared run state* (the tool instance's own list) rather than the workspace, so it's
+read-only with respect to the filesystem and auto-allowed. `tools/todo.py`.
 
 ## Anatomy of a tool
 

@@ -52,6 +52,20 @@ def test_renders_tool_call_and_result():
     assert "file.txt" in out  # first line of the result preview
 
 
+def test_renders_todo_checklist():
+    from agent.tools.todo import TodoItem, TodoStatus
+
+    renderer, buf = _renderer()
+    todos = [
+        TodoItem(content="done step", status=TodoStatus.COMPLETED),
+        TodoItem(content="active step", status=TodoStatus.IN_PROGRESS),
+        TodoItem(content="later step", status=TodoStatus.PENDING),
+    ]
+    renderer.handle(ToolEnd("c1", "todo_write", ToolResult(content="...", details={"todos": todos})))
+    out = buf.getvalue()
+    assert "done step" in out and "active step" in out and "later step" in out
+
+
 def test_renders_tool_error():
     renderer, buf = _renderer()
     renderer.handle(ToolEnd("c1", "read", ToolResult(content="File not found", is_error=True)))
