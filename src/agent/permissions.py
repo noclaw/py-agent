@@ -41,9 +41,11 @@ class PermissionMode(str, Enum):
 #: own ``read_only``/``permission_target`` policy wins, so a tool's gating lives in its own slice
 #: (see :class:`agent.types.Tool`). The consistency test keeps this set in sync with the tools.
 #: (The web tools do make outbound network requests; a ``deny`` rule can still block them.)
-READ_ONLY_TOOLS = frozenset({"read", "grep", "find", "ls", "web_fetch", "web_search"})
+READ_ONLY_TOOLS = frozenset(
+    {"read", "grep", "find", "ls", "web_fetch", "web_search", "recall", "search_memory"}
+)
 #: Name-only fallback for the built-in tools that change the world → gated by mode/rules/approval.
-MUTATING_TOOLS = frozenset({"write", "edit", "bash"})
+MUTATING_TOOLS = frozenset({"write", "edit", "bash", "note"})
 
 # Decision values returned by :meth:`Permissions.decide`.
 Decision = str  # "allow" | "deny" | "ask"

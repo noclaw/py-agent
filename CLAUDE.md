@@ -40,7 +40,7 @@ src/agent/
   compaction.py     # context compaction (transform_context seam)
   retry.py          # RetryPolicy for transient model errors
   checkpoints.py    # file-edit snapshots for /checkpoints and /rewind
-  tools/            # read/write/edit/bash/grep/find/ls + web + task (sub-agent);
+  tools/            # read/write/edit/bash/grep/find/ls + web + memory + task (sub-agent);
                     #   one BUILTIN_TOOL_CLASSES registry, each tool owns its gating policy
 tests/              # pytest; unit tests use a fake model (no network)
 docs/               # design + usage guides (start at docs/README.md)

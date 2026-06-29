@@ -93,6 +93,10 @@ Beyond the seven core phases, these optional features are also built:
 - ✅ **Edit checkpoints / undo** — snapshot a file's bytes before each successful
   `write`/`edit` (via `PreToolUse`/`PostToolUse` hooks); `/checkpoints` lists them and
   `/rewind [N]` restores the working tree. `checkpoints.py`.
+- ✅ **Memory / second-brain tools** — `note` (save), `recall` (read recent), and
+  `search_memory` (find) over one local markdown store (`~/.pya/memory.md`, override with
+  `PYA_MEMORY_FILE`). In the default toolset and as a standalone `memory_tools()` bundle —
+  the assistant-repurposing showcase. `tools/memory.py`.
 
 **Tests:** ~199 unit (scripted fake-model fixture + `httpx.MockTransport`, no network; the
 picker's interactive path runs through a PTY) + a few gated live integration tests
@@ -107,12 +111,13 @@ example to be complete; they're the natural next seams. Roughly ordered by value
 project's two goals — (a) readable learning example, (b) base for assistant / second-brain
 agents.
 
-### 1. Memory / second-brain tools
+### 1. Memory / second-brain tools — ✅ shipped
 
-The repurposing showcase: `note`, `recall`, `search_memory` over a local store (markdown
-files or sqlite). Demonstrates swapping the coding toolset for an assistant toolset via the
-same registry — directly serves goal (b). Good companion to
-[`docs/building-your-own-agent.md`](docs/building-your-own-agent.md).
+The repurposing showcase: `note`, `recall`, `search_memory` over a local markdown store.
+Demonstrates swapping the coding toolset for an assistant toolset via the same registry —
+directly serves goal (b). See `tools/memory.py`, the `memory_tools()` bundle, and the
+companion [`docs/building-your-own-agent.md`](docs/building-your-own-agent.md). A natural next
+step is a sqlite/embeddings backend behind the same three tools.
 
 ### 2. Images / vision
 

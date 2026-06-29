@@ -13,11 +13,16 @@ Tools are how the agent acts. Built-ins live in `src/agent/tools/`:
 | `ls` | list a directory |
 | `web_fetch` | fetch a URL and return its readable text (HTML → plain text) |
 | `web_search` | search the web (keyless DuckDuckGo) and return top results |
+| `note` | save a note to long-term memory (a local markdown store) |
+| `recall` | read back the most recent notes from memory |
+| `search_memory` | search memory for notes matching a query |
 | `task` | delegate a focused sub-task to a [sub-agent](#sub-agents-the-task-tool) (opt-in) |
 
-Bundles: `coding_tools(cwd)` (the file/shell tools + the two web tools) and
-`read_only_tools(cwd)` (read/grep/find/ls). The `task` tool is added separately via
-`with_task_tool(...)` because it needs a live model — see [below](#sub-agents-the-task-tool).
+Bundles: `coding_tools(cwd)` (the file/shell tools + the web and memory tools),
+`read_only_tools(cwd)` (read/grep/find/ls), and `memory_tools(store=None)` (just
+note/recall/search_memory — the [second-brain](building-your-own-agent.md) bundle). The
+`task` tool is added separately via `with_task_tool(...)` because it needs a live model — see
+[below](#sub-agents-the-task-tool).
 
 The built-in set has one source of truth: the ordered `BUILTIN_TOOL_CLASSES` tuple in
 `agent/tools/__init__.py`. `TOOL_CLASSES` (name → class) and `coding_tools()` both derive from
@@ -31,6 +36,16 @@ backend and returns `title / URL / snippet` rows — swap it for a search API (B
 …) in production. Both use `httpx` and are *read-only* (auto-allowed), but they make outbound
 network calls — a `deny` rule can block them by target, e.g.
 `Permissions(deny=["web_fetch(*internal*)"])` (web rules match the `url` / `query`).
+
+### Memory tools
+
+`note(text)` appends a timestamped bullet to a markdown store; `recall(limit)` reads back the
+most recent notes; `search_memory(query)` returns notes matching a substring/regex. The store
+is one human-readable file — `~/.pya/memory.md` by default, overridable with the
+`PYA_MEMORY_FILE` env var or the `store=` argument (the tests use `store=`). `note` is
+mutating (gated like `write`/`edit`; its rules match on the note text, e.g.
+`Permissions(deny=["note(*secret*)"])`); `recall`/`search_memory` are read-only. Together they
+make the loop a persistent second brain — see [Building your own agent](building-your-own-agent.md).
 
 ## Anatomy of a tool
 

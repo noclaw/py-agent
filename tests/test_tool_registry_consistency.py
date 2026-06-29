@@ -50,11 +50,11 @@ class _NoteArgs(BaseModel):
     topic: str
 
 
-class _NoteTool(Tool):
+class _CustomTool(Tool):
     """A custom tool the built-in name sets have never heard of — its own policy must win."""
 
-    name = "note"
-    description = "Record a note."
+    name = "scribble"
+    description = "Record a scribble."
     parameters = _NoteArgs
     read_only = True
 
@@ -68,11 +68,11 @@ class _NoteTool(Tool):
 
 def test_policy_is_sourced_from_the_tool_not_the_name_sets():
     perms = Permissions(mode=PermissionMode.DEFAULT)
-    tool = _NoteTool()
-    # 'note' is in neither READ_ONLY_TOOLS nor MUTATING_TOOLS, yet read_only=True is honored.
-    assert "note" not in READ_ONLY_TOOLS and "note" not in MUTATING_TOOLS
-    assert perms.decide("note", {"topic": "x"}, tool) == "allow"
+    tool = _CustomTool()
+    # 'scribble' is in neither READ_ONLY_TOOLS nor MUTATING_TOOLS, yet read_only=True is honored.
+    assert "scribble" not in READ_ONLY_TOOLS and "scribble" not in MUTATING_TOOLS
+    assert perms.decide("scribble", {"topic": "x"}, tool) == "allow"
     # ...and the tool's permission_target drives glob rules (matches on `topic`, not `path`).
-    denied = Permissions(deny=["note(secret*)"])
-    assert denied.decide("note", {"topic": "secret-plan"}, tool) == "deny"
-    assert denied.decide("note", {"topic": "public"}, tool) == "allow"
+    denied = Permissions(deny=["scribble(secret*)"])
+    assert denied.decide("scribble", {"topic": "secret-plan"}, tool) == "deny"
+    assert denied.decide("scribble", {"topic": "public"}, tool) == "allow"

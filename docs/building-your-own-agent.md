@@ -46,6 +46,12 @@ To let your agent delegate, wrap the toolset with
 
 ## Swap the toolset (a second-brain example)
 
+> **Already shipped.** The note/recall tools below now live in the codebase as
+> `agent.tools.memory` (`NoteTool`, `RecallTool`, `SearchMemoryTool`) over a markdown store at
+> `~/.pya/memory.md` (override with `PYA_MEMORY_FILE`). Grab them as a bundle with
+> `from agent.tools import memory_tools` — they're also in the default `coding_tools` set. The
+> walkthrough below is kept as the worked example of *how* such a tool is built.
+
 Replace the coding tools with your own. Tools are just `Tool` subclasses with a Pydantic
 parameter model (see [tools](tools.md)). A minimal note store:
 
